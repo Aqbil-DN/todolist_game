@@ -695,7 +695,7 @@ export default function SecondBrainApp() {
                     25:00
                   </div>
                   <div className="mt-12 flex gap-6">
-                    <button className="bg-[#FFD60A] text-black font-pixel text-xs py-4 px-8 comic-shadow-pink hover:-translate-y-1 transition-transform border-2 border-white">
+                    <button onClick={() => navigate('/enter')} className="bg-[#FFD60A] text-black font-pixel text-xs py-4 px-8 comic-shadow-pink hover:-translate-y-1 transition-transform border-2 border-white">
                       START GAME
                     </button>
                     <button className="bg-transparent border-2 border-[#00B4FF] text-[#00B4FF] font-pixel text-xs py-4 px-8 hover:bg-[#00B4FF]/20 hover:shadow-[0_0_15px_#00B4FF] transition-all">
