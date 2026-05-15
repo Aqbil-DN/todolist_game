@@ -10,10 +10,12 @@ import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import HeroCollection from './pages/HeroCollection';
 import Gacha from './pages/Gacha';
+import CustomCursor from './CustomCursor';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <CustomCursor />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
