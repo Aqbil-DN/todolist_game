@@ -16,29 +16,78 @@ export default function CustomCursor() {
   const S = '#FFFFFF'; // Shine/Edge
   const C = '#5CE1E6'; // Primary Blade (Cyan)
   const D = '#00B4FF'; // Secondary Blade (Deep Blue)
-  const G = '#FFD60A'; // Guard (Gold)
+  const G = '#FFD60A'; // Guard/Pommel (Gold)
   const H = '#FF5DA2'; // Hilt (Pink)
-  const _ = null;      // Transparent
 
-  // 16x16 Grid of Pixel Art Sword (Pointing Top-Left)
-  const swordGrid = [
-    [B, B, B, _, _, _, _, _, _, _, _, _, _, _, _, _],
-    [B, S, C, B, _, _, _, _, _, _, _, _, _, _, _, _],
-    [B, C, D, C, B, _, _, _, _, _, _, _, _, _, _, _],
-    [_, B, C, D, C, B, _, _, _, _, _, _, _, _, _, _],
-    [_, _, B, C, D, C, B, _, _, _, _, _, _, _, _, _],
-    [_, _, _, B, C, D, C, B, _, _, _, _, _, _, _, _],
-    [_, _, _, _, B, C, D, C, B, _, _, _, _, _, _, _],
-    [_, _, _, _, _, B, C, D, C, B, _, _, _, _, _, _],
-    [_, _, _, _, _, _, B, C, D, C, B, _, _, _, _, _],
-    [_, _, _, _, _, _, _, B, C, D, C, B, _, _, _, _],
-    [_, _, _, _, _, _, _, _, B, C, D, C, B, _, B, B],
-    [_, _, _, _, _, _, _, _, _, B, G, G, G, B, G, B],
-    [_, _, _, _, _, _, _, _, _, G, G, H, G, G, B, _],
-    [_, _, _, _, _, _, _, _, B, G, H, H, G, B, _, _],
-    [_, _, _, _, _, _, _, B, G, B, H, B, B, _, _, _],
-    [_, _, _, _, _, _, _, B, B, _, B, _, _, _, _, _]
-  ];
+  // Procedurally generate the 16x16 sword grid for mathematically perfect 100% symmetry
+  const baseGrid = Array(16).fill(null).map(() => Array(16).fill(null));
+
+  // 1. DRAW BLADE (Diagonal y=x, for x >= y)
+  baseGrid[0][0] = B; // Tip Outline
+  baseGrid[0][1] = B;
+  baseGrid[0][2] = B;
+
+  baseGrid[1][1] = S; // Tip shine
+  baseGrid[1][2] = C;
+  baseGrid[1][3] = B;
+
+  for (let i = 2; i <= 9; i++) {
+    baseGrid[i][i] = D;     // Core line
+    baseGrid[i][i+1] = C;   // Inside blade
+    baseGrid[i][i+2] = B;   // Blade outline
+  }
+
+  // 2. DRAW CROSSGUARD (Orthogonal to diagonal, Sum = y + x)
+  // Center line (Sum 20)
+  baseGrid[10][10] = G;
+  baseGrid[9][11] = G;
+  baseGrid[8][12] = G;
+  baseGrid[7][13] = B; // Guard Tip Cap
+
+  // Top line (Sum 19)
+  baseGrid[9][10] = G;
+  baseGrid[8][11] = G;
+  baseGrid[7][12] = B; // Guard Edge Outline
+
+  // Top-top outline (Sum 18)
+  baseGrid[8][10] = B;
+  baseGrid[7][11] = B;
+
+  // Bottom line (Sum 21)
+  baseGrid[10][11] = G;
+  baseGrid[9][12] = B;
+
+  // Bottom-bottom line (Sum 22)
+  baseGrid[10][12] = B;
+  
+  // 3. DRAW HANDLE AND POMMEL (Diagonal)
+  baseGrid[11][11] = H; // Handle Pink
+  baseGrid[11][12] = B; // Handle Outline
+
+  baseGrid[12][12] = H;
+  baseGrid[12][13] = B;
+
+  baseGrid[13][13] = H;
+  baseGrid[13][14] = B;
+
+  // Pommel (Pommel Center and Outer Outline)
+  baseGrid[14][14] = G; // Pommel Gold
+  baseGrid[14][15] = B;
+
+  baseGrid[15][15] = B; // End cap
+
+  // 4. REFLECT HALF DESIGN TO LOWER TRIANGLE TO GUARANTEE ABSOLUTE SYMMETRY
+  const swordGrid = Array(16).fill(null).map(() => Array(16).fill(null));
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (x >= y) {
+        swordGrid[y][x] = baseGrid[y][x];
+      } else {
+        // Mathematically guaranteed reflect across the diagonal axis!
+        swordGrid[y][x] = baseGrid[x][y];
+      }
+    }
+  }
 
   useEffect(() => {
     // Hide normal cursor on HTML/Body
