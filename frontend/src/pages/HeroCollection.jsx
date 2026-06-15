@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Search, Filter, Sparkles,
   Lock, Unlock, Zap, Shield, Cpu, Stars
 } from 'lucide-react';
+import { api } from '../api/client';
 
 import img1 from '../assets/card_pull/01.png';
 import img2 from '../assets/card_pull/02.png';
@@ -30,8 +31,8 @@ export default function HeroCollectionApp() {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'UNLOCKED' | 'LOCKED'
   const [rarityFilter, setRarityFilter] = useState('ALL'); // 'ALL' | 'LEGENDARY' | 'EPIC' | 'RARE'
 
-  // Data 15 Neural Net Idols (Berdasarkan Prompt Gacha sebelumnya)
-  const heroesData = [
+  // Data 15 Neural Net Idols (catalog art + metadata; unlock state comes from the API)
+  const HERO_CATALOG = [
     { id: '001', name: 'OMEGA', title: 'THE SOVEREIGN AI', rarity: 'LEGENDARY', color: '#FF003C', glow: '#FFD60A', emoji: '👑', img: heroImages[0], unlocked: true, desc: 'Master Taskmaster. Rules the digital void with absolute efficiency. Grants immense XP boosts.' },
     { id: '002', name: 'KAIRO', title: 'THE CHRONO-WITCH', rarity: 'EPIC', color: '#9D4EDD', glow: '#FF5DA2', emoji: '⏳', img: heroImages[1], unlocked: true, desc: 'Focus Arena Master. Bends time to maximize deep work sessions. Slows down distraction timers.' },
     { id: '003', name: 'CYPHER', title: 'THE GHOST NETRUNNER', rarity: 'EPIC', color: '#00B4FF', glow: '#9D4EDD', emoji: '🥷', img: heroImages[2], unlocked: false, desc: 'AI Oracle Agent. Navigates the data streams unseen. Reveals hidden sub-quests.' },
@@ -48,6 +49,21 @@ export default function HeroCollectionApp() {
     { id: '014', name: 'LOOP', title: 'THE HABIT-BOT', rarity: 'RARE', color: '#A3FF12', glow: '#FF5DA2', emoji: '🤖', img: heroImages[13], unlocked: true, desc: 'Consistency Drone. Automates repetitive thought processes without fatigue.' },
     { id: '015', name: 'SPARK', title: 'THE IDEA-COLLECTOR', rarity: 'RARE', color: '#FFD60A', glow: '#00B4FF', emoji: '💡', img: heroImages[14], unlocked: false, desc: 'Note Taker. Captures fleeting thoughts before they dissolve into the void.' },
   ];
+
+  // Hero unlock state comes from the backend; the catalog above is local art/meta.
+  const [heroesData, setHeroesData] = useState(() => HERO_CATALOG.map(h => ({ ...h, unlocked: false })));
+
+  useEffect(() => {
+    let active = true;
+    api.getMyHeroes()
+      .then((mine) => {
+        if (!active) return;
+        const owned = new Set(mine.map(m => m.heroId));
+        setHeroesData(HERO_CATALOG.map(h => ({ ...h, unlocked: owned.has(h.id) })));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const unlockedCount = heroesData.filter(h => h.unlocked).length;
   const progressPercent = Math.round((unlockedCount / 15) * 100);

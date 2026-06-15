@@ -6,6 +6,8 @@ import {
   Target, Activity, ChevronRight, ChevronLeft, Calendar, X, Shield, Cpu, Coins
 } from 'lucide-react';
 import { useCoins } from '../useCoins';
+import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 // Quest frequency categories (per-card, editable in edit mode)
 const FREQUENCIES = [
@@ -75,20 +77,31 @@ const recurrenceHint = (quest) => {
 
 export default function DashboardApp() {
   const navigate = useNavigate();
-  const { coins, addCoins } = useCoins();
-  const [playerXP, setPlayerXP] = useState(1240);
-  const [playerLevel, setPlayerLevel] = useState(24);
+  const { coins, setCoins } = useCoins();
+  const { profile } = useAuth();
+  const [playerXP, setPlayerXP] = useState(0);
+  const [playerLevel, setPlayerLevel] = useState(1);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [floatingXPs, setFloatingXPs] = useState([]);
   const xpBarRef = useRef(null);
 
-  // Main Quests State
-  const [quests, setQuests] = useState([
-    { id: 1, title: 'Drink 2L of Water', xp: 15, tag: 'HEALTH', color: '#FF5DA2', frequency: 'daily', date: toISO(new Date()), completed: false },
-    { id: 2, title: 'Finish Dashboard UI Component', xp: 100, tag: 'WORK', color: '#FFD60A', frequency: 'one-time', date: toISO(addDays(new Date(), 3)), completed: false },
-    { id: 3, title: 'Read 10 pages of Atomic Habits', xp: 25, tag: 'LEARN', color: '#5CE1E6', frequency: 'daily', date: toISO(new Date()), completed: false },
-    { id: 4, title: '30 Min Cardio Workout', xp: 50, tag: 'FITNESS', color: '#A3FF12', frequency: 'weekly', date: toISO(new Date()), completed: true },
-  ]);
+  // Main Quests State (loaded from the backend)
+  const [quests, setQuests] = useState([]);
+
+  // Load quests on mount.
+  useEffect(() => {
+    let active = true;
+    api.getQuests().then((data) => { if (active) setQuests(data); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // Sync XP / level from the authenticated profile.
+  useEffect(() => {
+    if (profile) {
+      setPlayerXP(profile.xp ?? 0);
+      setPlayerLevel(profile.level ?? 1);
+    }
+  }, [profile]);
 
   // Quest creation + edit State
   const [newTaskInput, setNewTaskInput] = useState('');
@@ -97,19 +110,11 @@ export default function DashboardApp() {
   const [selectedQuestId, setSelectedQuestId] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
 
-  const handleCompleteQuest = (e, quest) => {
+  const handleCompleteQuest = async (e, quest) => {
     if (editMode) return; // No completing while editing
     if (quest.completed) return; // Prevent double completion
 
-    // 1. Mark as complete
-    setQuests(quests.map(q => q.id === quest.id ? { ...q, completed: true } : q));
-
-    // 2. Add XP + coins (coins = same amount as XP, spendable on Gacha)
-    setPlayerXP(prev => prev + quest.xp);
-    addCoins(quest.xp);
-
-    // 3. Create floating XP text at mouse click coordinates
-    const rect = e.currentTarget.getBoundingClientRect();
+    // Floating XP text at the click coordinates (captured before awaiting).
     const newFloatingXP = {
       id: Date.now(),
       x: e.clientX,
@@ -117,30 +122,51 @@ export default function DashboardApp() {
       amount: quest.xp,
       color: quest.color
     };
-
     setFloatingXPs(prev => [...prev, newFloatingXP]);
-
-    // 4. Remove floating XP after animation finishes
     setTimeout(() => {
       setFloatingXPs(prev => prev.filter(fxp => fxp.id !== newFloatingXP.id));
     }, 1000);
+
+    // Persist completion; the server awards XP + coins and recomputes level.
+    try {
+      const result = await api.completeQuest(quest.id);
+      setQuests(prev => prev.map(q => q.id === quest.id ? { ...q, completed: true } : q));
+      setPlayerXP(result.xp);
+      setPlayerLevel(result.level);
+      setCoins(result.coins);
+    } catch {
+      // leave state unchanged on failure
+    }
   };
 
-  const addNormalTask = () => {
+  const addNormalTask = async () => {
     if (!newTaskInput.trim()) return;
     const category = CATEGORIES.find(c => c.tag === newTaskCategory) || CATEGORIES[0];
-    const newQuest = { id: Date.now(), title: newTaskInput, xp: 15, tag: category.tag, color: category.color, frequency: 'daily', date: toISO(new Date()), completed: false };
-    setQuests(prev => [newQuest, ...prev]);
-    setNewTaskInput('');
+    try {
+      const created = await api.createQuest({
+        title: newTaskInput.trim(),
+        xp: 15,
+        tag: category.tag,
+        color: category.color,
+        frequency: 'daily',
+        date: toISO(new Date()),
+      });
+      setQuests(prev => [created, ...prev]);
+      setNewTaskInput('');
+    } catch {
+      // ignore creation failure
+    }
   };
 
   const changeFrequency = (id, frequency) => {
     setQuests(prev => prev.map(q => q.id === id ? { ...q, frequency } : q));
+    api.updateQuest(id, { frequency }).catch(() => {});
   };
 
   const changeDate = (id, iso) => {
     setQuests(prev => prev.map(q => q.id === id ? { ...q, date: iso } : q));
     setSelectedQuestId(id);
+    api.updateQuest(id, { date: iso }).catch(() => {});
   };
 
   const CustomStyles = () => (
@@ -324,7 +350,7 @@ export default function DashboardApp() {
 
             <div onClick={() => navigate('/profile')} className="flex items-center gap-3 pl-6 border-l-2 border-[#00B4FF]/30 cursor-pointer group">
               <div className="text-right hidden sm:block">
-                <div className="font-sans font-bold text-sm text-white group-hover:text-[#5CE1E6] transition-colors">Player_One</div>
+                <div className="font-sans font-bold text-sm text-white group-hover:text-[#5CE1E6] transition-colors">{profile?.username || 'Player_One'}</div>
                 <div className="font-pixel text-[8px] text-[#FFD60A]">LVL {playerLevel}</div>
               </div>
               <div className="w-10 h-10 bg-gradient-to-br from-[#5CE1E6] to-[#FF5DA2] rounded border-2 border-white flex items-center justify-center">

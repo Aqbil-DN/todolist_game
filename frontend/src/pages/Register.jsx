@@ -4,9 +4,11 @@ import {
   ArrowLeft, User, Monitor, 
   Paintbrush, Crosshair, Loader2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function CreateCharacterApp() {
   const navigate = useNavigate();
+  const { firebaseUser, signInWithGoogle, registerProfile } = useAuth();
   const [selectedClass, setSelectedClass] = useState('hacker');
   const [playerTag, setPlayerTag] = useState('');
   const [isForging, setIsForging] = useState(false);
@@ -44,7 +46,7 @@ export default function CreateCharacterApp() {
 
   const activeClass = characterClasses.find(c => c.id === selectedClass);
 
-  const handleForgeCharacter = (e) => {
+  const handleForgeCharacter = async (e) => {
     e.preventDefault();
     if (!playerTag) {
       setErrorMessage('SYSTEM ERROR: PLAYER TAG REQUIRED TO FORGE.');
@@ -54,14 +56,20 @@ export default function CreateCharacterApp() {
       setErrorMessage('SYSTEM ERROR: PLAYER TAG TOO SHORT.');
       return;
     }
-    
+
     setErrorMessage('');
     setIsForging(true);
-    
-    // Simulate Google OAuth flow for Registration
-    setTimeout(() => {
-      navigate('/');
-    }, 2500);
+
+    try {
+      if (!firebaseUser) {
+        await signInWithGoogle();
+      }
+      await registerProfile({ player_tag: playerTag, class_id: selectedClass });
+      navigate('/dashboard');
+    } catch (err) {
+      setErrorMessage(`SYSTEM ERROR: ${err?.message || 'REGISTRATION FAILED'}`.toUpperCase());
+      setIsForging(false);
+    }
   };
 
   const CustomStyles = () => (

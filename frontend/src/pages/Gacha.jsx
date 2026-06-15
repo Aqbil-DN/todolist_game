@@ -5,6 +5,7 @@ import {
   Cpu, Zap, Fingerprint, Star, RefreshCcw, Coins
 } from 'lucide-react';
 import { useCoins } from '../useCoins';
+import { api } from '../api/client';
 
 import img1 from '../assets/card_pull/01.png';
 import img2 from '../assets/card_pull/02.png';
@@ -28,7 +29,7 @@ const heroImages = [
 
 export default function GachaApp() {
   const navigate = useNavigate();
-  const { coins, spendCoins } = useCoins();
+  const { coins, setCoins } = useCoins();
   const [gachaState, setGachaState] = useState('idle'); // 'idle' | 'hacking' | 'revealing' | 'result'
   const [pulledHeroes, setPulledHeroes] = useState([]);
   const [decryptLogs, setDecryptLogs] = useState([]);
@@ -37,30 +38,13 @@ export default function GachaApp() {
   // Cost per single pull (10x = COST_PER_PULL * 10)
   const COST_PER_PULL = 100;
 
-  // Data 15 Neural Net Idols untuk Gacha Pool
-  const gachaPool = [
-    { id: '001', name: 'OMEGA', title: 'THE SOVEREIGN AI', rarity: 'LEGENDARY', color: '#FF003C', glow: '#FFD60A', emoji: '👑', img: heroImages[0] },
-    { id: '002', name: 'KAIRO', title: 'THE CHRONO-WITCH', rarity: 'EPIC', color: '#9D4EDD', glow: '#FF5DA2', emoji: '⏳', img: heroImages[1] },
-    { id: '003', name: 'CYPHER', title: 'THE GHOST NETRUNNER', rarity: 'EPIC', color: '#00B4FF', glow: '#9D4EDD', emoji: '🥷', img: heroImages[2] },
-    { id: '004', name: 'GIA', title: 'THE ENERGY ALCHEMIST', rarity: 'EPIC', color: '#FF5DA2', glow: '#A3FF12', emoji: '⚗️', img: heroImages[3] },
-    { id: '005', name: 'REX', title: 'THE CYBER-SAMURAI', rarity: 'EPIC', color: '#A3FF12', glow: '#00B4FF', emoji: '⚔️', img: heroImages[4] },
-    { id: '006', name: 'PULSE', title: 'THE DATA DRUMMER', rarity: 'RARE', color: '#00B4FF', glow: '#00B4FF', emoji: '🥁', img: heroImages[5] },
-    { id: '007', name: 'VECTOR', title: 'THE GRAFFITI HACKER', rarity: 'RARE', color: '#FFD60A', glow: '#FF5DA2', emoji: '🎨', img: heroImages[6] },
-    { id: '008', name: 'SHADE', title: 'THE COFFEE TECHNO-MAGE', rarity: 'RARE', color: '#FF9F1C', glow: '#FFD60A', emoji: '☕', img: heroImages[7] },
-    { id: '009', name: 'NOVA', title: 'THE STAR-CHART PILOT', rarity: 'RARE', color: '#A3FF12', glow: '#A3FF12', emoji: '🚀', img: heroImages[8] },
-    { id: '010', name: 'BLADE', title: 'THE INBOX-SLAYER', rarity: 'RARE', color: '#9D4EDD', glow: '#9D4EDD', emoji: '🗡️', img: heroImages[9] },
-    { id: '011', name: 'REZ', title: 'THE GLITCH-GEISHA', rarity: 'RARE', color: '#FF003C', glow: '#00B4FF', emoji: '🎎', img: heroImages[10] },
-    { id: '012', name: 'DRIFT', title: 'THE SYNTHWAVE RACER', rarity: 'RARE', color: '#FF5DA2', glow: '#FFD60A', emoji: '🏎️', img: heroImages[11] },
-    { id: '013', name: 'ECHO', title: 'THE SOUND-TRACKER', rarity: 'RARE', color: '#5CE1E6', glow: '#5CE1E6', emoji: '🎧', img: heroImages[12] },
-    { id: '014', name: 'LOOP', title: 'THE HABIT-BOT', rarity: 'RARE', color: '#A3FF12', glow: '#FF5DA2', emoji: '🤖', img: heroImages[13] },
-    { id: '015', name: 'SPARK', title: 'THE IDEA-COLLECTOR', rarity: 'RARE', color: '#FFD60A', glow: '#00B4FF', emoji: '💡', img: heroImages[14] },
-  ];
+  // Gacha Logic & Rates (server-authoritative: the backend rolls and persists).
+  const performPull = async (times) => {
+    if (gachaState === 'hacking') return;
 
-  // Gacha Logic & Rates
-  const performPull = (times) => {
-    // Charge coins up-front; block the pull if the wallet is too low.
+    // Quick client-side guard for UX; the server is the real source of truth.
     const cost = times * COST_PER_PULL;
-    if (!spendCoins(cost)) {
+    if (coins < cost) {
       setInsufficient(true);
       setTimeout(() => setInsufficient(false), 2200);
       return;
@@ -70,21 +54,24 @@ export default function GachaApp() {
     setDecryptLogs([]);
     setPulledHeroes([]);
 
-    const newPulls = [];
-    for (let i = 0; i < times; i++) {
-      const rand = Math.random() * 100;
-      let selectedRarity = 'RARE';
-
-      // Rates: 5% Legendary, 25% Epic, 70% Rare
-      if (rand <= 5) selectedRarity = 'LEGENDARY';
-      else if (rand <= 30) selectedRarity = 'EPIC';
-
-      const availableHeroes = gachaPool.filter(h => h.rarity === selectedRarity);
-      const randomHero = availableHeroes[Math.floor(Math.random() * availableHeroes.length)];
-
-      // Generate unique key for mapping just in case of duplicates
-      newPulls.push({ ...randomHero, pullId: `pull_${Date.now()}_${i}` });
+    let result;
+    try {
+      result = await api.pullGacha(times);
+    } catch {
+      setGachaState('idle');
+      setInsufficient(true);
+      setTimeout(() => setInsufficient(false), 2200);
+      return;
     }
+
+    setCoins(result.coins);
+
+    // Map the server's hero ids back to the locally bundled card art.
+    const newPulls = result.pulls.map((hero, i) => ({
+      ...hero,
+      img: heroImages[parseInt(hero.id, 10) - 1],
+      pullId: `pull_${Date.now()}_${i}`,
+    }));
 
     // Sequence Animation
     const logs = [

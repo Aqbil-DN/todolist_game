@@ -1,37 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, User, Mail, Calendar, Shield, 
   Activity, Cpu, Zap, Edit2, Save, X, Camera, 
   TerminalSquare, Loader2, Sparkles
 } from 'lucide-react';
+import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+
+// Map the backend user payload to the shape this screen renders.
+const mapProfile = (p = {}) => ({
+  username: p.playerTag || p.username || 'PLAYER_ONE',
+  title: p.title || 'INITIATE',
+  email: p.email || '',
+  bio: p.bio || '',
+  joinDate: p.createdAt
+    ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
+    : '—',
+  level: p.level ?? 1,
+  xp: (p.xp ?? 0).toLocaleString(),
+  color: p.color || '#5CE1E6',
+  stats: {
+    focus: p.stats?.focus ?? 50,
+    consistency: p.stats?.consistency ?? 50,
+    creativity: p.stats?.creativity ?? 50,
+    stamina: p.stats?.stamina ?? 50,
+  },
+});
 
 export default function ProfileApp() {
   const navigate = useNavigate();
+  const { profile: authProfile, refreshProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoreLoading, setIsLoreLoading] = useState(false);
 
-  // Initial Profile Data
-  const [profile, setProfile] = useState({
-    username: 'PLAYER_ONE',
-    title: 'CYBER HACKER',
-    email: 'player.one@secondbrain.net',
-    bio: 'Just trying to survive the daily grind and level up my coding skills. 14-day streak intact.',
-    joinDate: '12 OCT 2025',
-    level: 24,
-    xp: '12,450',
-    color: '#5CE1E6', // Ghost Cyan
-    stats: {
-      focus: 85,
-      consistency: 90,
-      creativity: 60,
-      stamina: 75
-    }
-  });
+  // Profile mirrors the authenticated user (defaults fill any gaps).
+  const [profile, setProfile] = useState(() => mapProfile(authProfile || {}));
 
   // Temp Data for Editing
-  const [editData, setEditData] = useState({ ...profile });
+  const [editData, setEditData] = useState(() => mapProfile(authProfile || {}));
+
+  // Re-sync when the authenticated profile loads or changes.
+  useEffect(() => {
+    if (authProfile) {
+      const mapped = mapProfile(authProfile);
+      setProfile(mapped);
+      setEditData(mapped);
+    }
+  }, [authProfile]);
 
   const handleEditToggle = () => {
     setEditData({ ...profile }); // Reset temp data to current profile
@@ -80,16 +97,24 @@ export default function ProfileApp() {
     setIsLoreLoading(false);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-
-    // Simulate API Call
-    setTimeout(() => {
+    try {
+      await api.updateProfile({
+        player_tag: editData.username,
+        title: editData.title,
+        email: editData.email,
+        bio: editData.bio,
+      });
+      await refreshProfile();
       setProfile({ ...editData });
-      setIsSaving(false);
       setIsEditing(false);
-    }, 1500);
+    } catch {
+      // keep the editor open if the save fails
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const CustomStyles = () => (

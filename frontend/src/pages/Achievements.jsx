@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Trophy, Lock, Unlock, Search, Filter
 } from 'lucide-react';
+import { api } from '../api/client';
 
 export default function AchievementsApp() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'UNLOCKED' | 'LOCKED'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Exactly 50 Achievements Categorized by color/theme
-  const achievementsData = [
+  // Exactly 50 Achievements Categorized by color/theme (catalog; unlock state from the API)
+  const ACHIEVEMENT_CATALOG = [
     // 🟢 QUESTS & TASKS (Green)
     { id: 1, title: 'FIRST BLOOD', desc: 'Selesaikan 1 Quest pertama.', emoji: '🔪', color: '#A3FF12', unlocked: true },
     { id: 2, title: 'TASK SLAYER', desc: 'Selesaikan 10 Quest.', emoji: '⚔️', color: '#A3FF12', unlocked: true },
@@ -75,6 +76,21 @@ export default function AchievementsApp() {
     { id: 99, title: 'GHOST IN THE MACHINE', desc: 'Temukan pesan rahasia di dalam source code sistem.', emoji: '👁️', color: '#FF003C', unlocked: true, isSecret: true },
     { id: 100, title: 'NIGHTMARE MODE', desc: 'Selesaikan 5 Boss Arena berturut-turut tanpa gagal.', emoji: '🩸', color: '#FF003C', unlocked: false, isSecret: true }
   ];
+
+  // Unlock state comes from the backend; the catalog above is local metadata.
+  const [achievementsData, setAchievementsData] = useState(() => ACHIEVEMENT_CATALOG.map(a => ({ ...a, unlocked: false })));
+
+  useEffect(() => {
+    let active = true;
+    api.getMyAchievements()
+      .then((mine) => {
+        if (!active) return;
+        const owned = new Set(mine.map(m => m.achievementId));
+        setAchievementsData(ACHIEVEMENT_CATALOG.map(a => ({ ...a, unlocked: owned.has(a.id) })));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   // Calculate progress HANYA untuk achievement normal (Maksimal 50)
   const regularAchievements = achievementsData.filter(a => !a.isSecret);

@@ -4,6 +4,33 @@ import {
   ArrowLeft, Bell, Trash2, Target, Cpu, 
   ShieldAlert, Zap, Users, CheckCircle2, Radar, X
 } from 'lucide-react';
+import { api } from '../api/client';
+
+// Map backend notification types to a local icon + accent color.
+const TYPE_STYLES = {
+  ALERT: { color: '#FF003C', icon: <ShieldAlert className="w-6 h-6" /> },
+  QUEST: { color: '#A3FF12', icon: <Target className="w-6 h-6" /> },
+  SYSTEM: { color: '#FFD60A', icon: <Zap className="w-6 h-6" /> },
+  SOCIAL: { color: '#00B4FF', icon: <Users className="w-6 h-6" /> },
+};
+const DEFAULT_STYLE = { color: '#6A4CFF', icon: <Cpu className="w-6 h-6" /> };
+
+const relativeTime = (iso) => {
+  if (!iso) return '';
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+};
+
+const decorateLog = (n) => {
+  const style = TYPE_STYLES[n.type] || DEFAULT_STYLE;
+  return { ...n, color: style.color, icon: style.icon, time: relativeTime(n.createdAt) };
+};
 
 export default function NotificationsApp() {
   const navigate = useNavigate();
@@ -11,64 +38,22 @@ export default function NotificationsApp() {
   const [isPurging, setIsPurging] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null); // State untuk Pop-up
   
-  // Dummy Notification Data
-  const [logs, setLogs] = useState([
-    {
-      id: 1,
-      type: 'ALERT',
-      title: 'STREAK WARNING',
-      message: 'Your 14-Day combo is in danger! Complete a quest before midnight.',
-      time: '10 mins ago',
-      read: false,
-      color: '#FF003C', // Danger Red
-      icon: <ShieldAlert className="w-6 h-6" />
-    },
-    {
-      id: 2,
-      type: 'QUEST',
-      title: 'QUEST COMPLETED',
-      message: 'You vanquished "The Ceramic Horde" (Wash Dishes). +50 XP added to your core.',
-      time: '1 hour ago',
-      read: false,
-      color: '#A3FF12', // Matrix Green
-      icon: <Target className="w-6 h-6" />
-    },
-    {
-      id: 3,
-      type: 'SYSTEM',
-      title: 'ACHIEVEMENT UNLOCKED',
-      message: 'Badge Unlocked: "EARLY BIRD". Reward: Rare Profile Aura.',
-      time: '3 hours ago',
-      read: true,
-      color: '#FFD60A', // Pac Yellow
-      icon: <Zap className="w-6 h-6" />
-    },
-    {
-      id: 4,
-      type: 'SOCIAL',
-      title: 'GUILD ACTIVITY',
-      message: 'Player_Two just beat your Focus Arena record by 15 minutes.',
-      time: '5 hours ago',
-      read: false,
-      color: '#00B4FF', // Maze Blue
-      icon: <Users className="w-6 h-6" />
-    },
-    {
-      id: 5,
-      type: 'SYSTEM',
-      title: 'UPLINK ESTABLISHED',
-      message: 'Second Brain OS V.2.0.4 successfully installed. New AI Oracle features are now online.',
-      time: '1 day ago',
-      read: true,
-      color: '#6A4CFF', // Purple
-      icon: <Cpu className="w-6 h-6" />
-    }
-  ]);
+  // Notifications are loaded from the backend.
+  const [logs, setLogs] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    api.getNotifications()
+      .then((data) => { if (active) setLogs(data.map(decorateLog)); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const unreadCount = logs.filter(log => !log.read).length;
 
   const markAsRead = (id) => {
-    setLogs(logs.map(log => log.id === id ? { ...log, read: true } : log));
+    setLogs(prev => prev.map(log => log.id === id ? { ...log, read: true } : log));
+    api.markNotificationRead(id).catch(() => {});
   };
 
   const handleLogClick = (log) => {
@@ -78,8 +63,9 @@ export default function NotificationsApp() {
 
   const purgeLogs = () => {
     setIsPurging(true);
+    api.purgeReadNotifications().catch(() => {});
     setTimeout(() => {
-      setLogs(logs.filter(log => !log.read)); // Hapus yang sudah dibaca saja
+      setLogs(prev => prev.filter(log => !log.read)); // Hapus yang sudah dibaca saja
       setIsPurging(false);
     }, 800);
   };

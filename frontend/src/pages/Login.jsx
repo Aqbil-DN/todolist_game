@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Gamepad2, Zap, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function InsertCoinApp() {
   const navigate = useNavigate();
+  const { signInWithGoogle } = useAuth();
   const [gameState, setGameState] = useState('waiting'); // 'waiting' | 'inserting' | 'login' | 'authenticating'
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleInsertCoin = () => {
     setGameState('inserting');
@@ -14,12 +17,16 @@ export default function InsertCoinApp() {
     }, 1500);
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    setErrorMessage('');
     setGameState('authenticating');
-    // Simulate Google OAuth flow
-    setTimeout(() => {
-      navigate('/');
-    }, 2000);
+    try {
+      const me = await signInWithGoogle();
+      navigate(me?.needsProfile ? '/register' : '/dashboard');
+    } catch (err) {
+      setErrorMessage((err?.message || 'AUTH LINK FAILED').toUpperCase());
+      setGameState('login');
+    }
   };
 
   const CustomStyles = () => (
@@ -221,6 +228,12 @@ export default function InsertCoinApp() {
               </>
             )}
           </button>
+
+          {errorMessage && (
+            <div className="mt-6 bg-red-500/20 border-2 border-[#FF5DA2] p-3 rounded text-center shadow-[0_0_10px_#FF5DA2]">
+              <span className="font-pixel text-[8px] text-[#FF5DA2] animate-pulse">{errorMessage}</span>
+            </div>
+          )}
 
           <p className="text-center font-sans text-sm text-white/50 mt-8">
             New to the Arcade? <button onClick={(e) => { e.preventDefault(); navigate('/register'); }} className="text-[#5CE1E6] hover:text-[#FFD60A] hover:underline transition-colors font-bold">Create Character</button>
