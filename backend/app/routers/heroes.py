@@ -18,7 +18,7 @@ def list_heroes(conn=Depends(get_conn)):
 def my_heroes(user=Depends(get_current_user), conn=Depends(get_conn)):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT hero_id, copies, unlocked_at FROM user_heroes WHERE user_id = ?",
+        "SELECT hero_id, copies, unlocked_at FROM user_heroes WHERE user_id = %s",
         (user["id"],),
     )
     return [

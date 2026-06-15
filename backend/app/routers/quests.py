@@ -33,13 +33,13 @@ def serialize_quest(quest: dict) -> dict:
 
 def _unlock_achievement(cursor, user_id: int, achievement_id: int) -> bool:
     cursor.execute(
-        "SELECT 1 AS found FROM user_achievements WHERE user_id = ? AND achievement_id = ?",
+        "SELECT 1 AS found FROM user_achievements WHERE user_id = %s AND achievement_id = %s",
         (user_id, achievement_id),
     )
     if fetch_one(cursor):
         return False
     cursor.execute(
-        "INSERT INTO user_achievements (user_id, achievement_id) VALUES (?, ?)",
+        "INSERT INTO user_achievements (user_id, achievement_id) VALUES (%s, %s)",
         (user_id, achievement_id),
     )
     return True
@@ -49,7 +49,7 @@ def _unlock_achievement(cursor, user_id: int, achievement_id: int) -> bool:
 def list_quests(user=Depends(get_current_user), conn=Depends(get_conn)):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM quests WHERE user_id = ? ORDER BY created_at DESC, id DESC",
+        "SELECT * FROM quests WHERE user_id = %s ORDER BY created_at DESC, id DESC",
         (user["id"],),
     )
     return [serialize_quest(quest) for quest in fetch_all(cursor)]
@@ -65,7 +65,8 @@ def create_quest(
     cursor.execute(
         """
         INSERT INTO quests (user_id, title, xp, tag, color, frequency, quest_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
         """,
         (
             user["id"],
@@ -77,8 +78,9 @@ def create_quest(
             payload.date,
         ),
     )
+    new_id = cursor.fetchone()[0]
     conn.commit()
-    cursor.execute("SELECT * FROM quests WHERE id = LAST_INSERT_ID()")
+    cursor.execute("SELECT * FROM quests WHERE id = %s", (new_id,))
     return serialize_quest(fetch_one(cursor))
 
 
@@ -91,7 +93,7 @@ def update_quest(
 ):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM quests WHERE id = ? AND user_id = ?", (quest_id, user["id"])
+        "SELECT * FROM quests WHERE id = %s AND user_id = %s", (quest_id, user["id"])
     )
     if not fetch_one(cursor):
         raise HTTPException(status_code=404, detail="Quest not found")
@@ -101,17 +103,17 @@ def update_quest(
     values: list = []
     for key, value in data.items():
         column = _COLUMN_MAP[key]
-        fields.append(f"{column} = ?")
+        fields.append(f"{column} = %s")
         values.append(int(value) if key == "completed" else value)
 
     if fields:
         values.append(quest_id)
         cursor.execute(
-            f"UPDATE quests SET {', '.join(fields)} WHERE id = ?", tuple(values)
+            f"UPDATE quests SET {', '.join(fields)} WHERE id = %s", tuple(values)
         )
         conn.commit()
 
-    cursor.execute("SELECT * FROM quests WHERE id = ?", (quest_id,))
+    cursor.execute("SELECT * FROM quests WHERE id = %s", (quest_id,))
     return serialize_quest(fetch_one(cursor))
 
 
@@ -123,7 +125,7 @@ def delete_quest(
 ):
     cursor = conn.cursor()
     cursor.execute(
-        "DELETE FROM quests WHERE id = ? AND user_id = ?", (quest_id, user["id"])
+        "DELETE FROM quests WHERE id = %s AND user_id = %s", (quest_id, user["id"])
     )
     conn.commit()
     return Response(status_code=204)
@@ -137,7 +139,7 @@ def complete_quest(
 ):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM quests WHERE id = ? AND user_id = ?", (quest_id, user["id"])
+        "SELECT * FROM quests WHERE id = %s AND user_id = %s", (quest_id, user["id"])
     )
     quest = fetch_one(cursor)
     if not quest:
@@ -151,17 +153,17 @@ def complete_quest(
     new_coins = user["coins"] + reward
 
     cursor.execute(
-        "UPDATE quests SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE quests SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = %s",
         (quest_id,),
     )
     cursor.execute(
-        "UPDATE users SET xp = ?, level = ?, coins = ? WHERE id = ?",
+        "UPDATE users SET xp = %s, level = %s, coins = %s WHERE id = %s",
         (new_xp, new_level, new_coins, user["id"]),
     )
 
     unlocked: list[int] = []
     cursor.execute(
-        "SELECT COUNT(*) AS completed_count FROM quests WHERE user_id = ? AND completed = 1",
+        "SELECT COUNT(*) AS completed_count FROM quests WHERE user_id = %s AND completed = 1",
         (user["id"],),
     )
     if fetch_one(cursor)["completed_count"] == 1 and _unlock_achievement(
@@ -171,7 +173,7 @@ def complete_quest(
 
     conn.commit()
 
-    cursor.execute("SELECT * FROM quests WHERE id = ?", (quest_id,))
+    cursor.execute("SELECT * FROM quests WHERE id = %s", (quest_id,))
     return {
         "quest": serialize_quest(fetch_one(cursor)),
         "xp": new_xp,

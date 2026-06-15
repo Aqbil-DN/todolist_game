@@ -7,7 +7,7 @@ Run from the backend directory (so the .env file is picked up):
 import sys
 from pathlib import Path
 
-import pyodbc
+import psycopg2
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -44,15 +44,22 @@ def run_sql_file(cursor, path: Path) -> None:
 
 def main() -> None:
     settings = get_settings()
-    if not settings.pyodbc_connection_string:
-        print("ERROR: PYODBC_CONNECTION_STRING is not set. Create backend/.env first.")
+    if not settings.database_url:
+        print("ERROR: DATABASE_URL is not set. Create backend/.env first.")
         sys.exit(1)
 
     data_dir = Path(__file__).resolve().parents[1] / "data"
-    conn = pyodbc.connect(settings.pyodbc_connection_string, autocommit=False)
-    conn.setdecoding(pyodbc.SQL_CHAR, encoding="utf-8")
-    conn.setdecoding(pyodbc.SQL_WCHAR, encoding="utf-8")
-    conn.setencoding(encoding="utf-8")
+    try:
+        conn = psycopg2.connect(settings.database_url)
+    except psycopg2.OperationalError as exc:
+        print(f"ERROR: could not connect to PostgreSQL: {exc}")
+        print(
+            "Hint: Supabase direct connections (db.<ref>.supabase.co) are "
+            "IPv6-only. On an IPv4 network, use the Session pooler URL:\n"
+            "  postgresql://postgres.<project-ref>:<password>"
+            "@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
+        )
+        sys.exit(1)
 
     try:
         cursor = conn.cursor()

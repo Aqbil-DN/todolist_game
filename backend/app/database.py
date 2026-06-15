@@ -1,20 +1,16 @@
-import pyodbc
+import psycopg2
 
 from .config import get_settings
 
 
-def get_connection() -> pyodbc.Connection:
-    """Open a new pyodbc connection configured for utf8mb4 (emoji-safe)."""
+def get_connection():
+    """Open a new psycopg2 connection (PostgreSQL is UTF-8, emoji-safe)."""
     settings = get_settings()
-    if not settings.pyodbc_connection_string:
+    if not settings.database_url:
         raise RuntimeError(
-            "PYODBC_CONNECTION_STRING is not configured. Set it in backend/.env"
+            "DATABASE_URL is not configured. Set it in backend/.env"
         )
-    conn = pyodbc.connect(settings.pyodbc_connection_string, autocommit=False)
-    conn.setdecoding(pyodbc.SQL_CHAR, encoding="utf-8")
-    conn.setdecoding(pyodbc.SQL_WCHAR, encoding="utf-8")
-    conn.setencoding(encoding="utf-8")
-    return conn
+    return psycopg2.connect(settings.database_url)
 
 
 def get_conn():

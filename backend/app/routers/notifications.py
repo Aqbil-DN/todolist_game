@@ -23,7 +23,7 @@ def serialize_notification(notification: dict) -> dict:
 def list_notifications(user=Depends(get_current_user), conn=Depends(get_conn)):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC, id DESC",
+        "SELECT * FROM notifications WHERE user_id = %s ORDER BY created_at DESC, id DESC",
         (user["id"],),
     )
     return [serialize_notification(item) for item in fetch_all(cursor)]
@@ -37,7 +37,7 @@ def mark_read(
 ):
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
+        "UPDATE notifications SET is_read = 1 WHERE id = %s AND user_id = %s",
         (notification_id, user["id"]),
     )
     conn.commit()
@@ -48,7 +48,7 @@ def mark_read(
 def purge_read(user=Depends(get_current_user), conn=Depends(get_conn)):
     cursor = conn.cursor()
     cursor.execute(
-        "DELETE FROM notifications WHERE user_id = ? AND is_read = 1", (user["id"],)
+        "DELETE FROM notifications WHERE user_id = %s AND is_read = 1", (user["id"],)
     )
     conn.commit()
     return {"status": "ok"}

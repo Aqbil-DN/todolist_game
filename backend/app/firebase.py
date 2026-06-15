@@ -61,14 +61,14 @@ def get_current_user(
     email = decoded.get("email")
 
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
+    cursor.execute("SELECT * FROM users WHERE firebase_uid = %s", (uid,))
     user = fetch_one(cursor)
     if user is None:
         cursor.execute(
-            "INSERT INTO users (firebase_uid, email) VALUES (?, ?)",
+            "INSERT INTO users (firebase_uid, email) VALUES (%s, %s)",
             (uid, email),
         )
         conn.commit()
-        cursor.execute("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
+        cursor.execute("SELECT * FROM users WHERE firebase_uid = %s", (uid,))
         user = fetch_one(cursor)
     return user

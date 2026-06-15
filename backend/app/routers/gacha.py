@@ -48,25 +48,25 @@ def pull(
         hero = random.choice(pool)
 
         cursor.execute(
-            "SELECT copies FROM user_heroes WHERE user_id = ? AND hero_id = ?",
+            "SELECT copies FROM user_heroes WHERE user_id = %s AND hero_id = %s",
             (user["id"], hero["id"]),
         )
         is_new = fetch_one(cursor) is None
         if is_new:
             cursor.execute(
-                "INSERT INTO user_heroes (user_id, hero_id, copies) VALUES (?, ?, 1)",
+                "INSERT INTO user_heroes (user_id, hero_id, copies) VALUES (%s, %s, 1)",
                 (user["id"], hero["id"]),
             )
         else:
             cursor.execute(
-                "UPDATE user_heroes SET copies = copies + 1 WHERE user_id = ? AND hero_id = ?",
+                "UPDATE user_heroes SET copies = copies + 1 WHERE user_id = %s AND hero_id = %s",
                 (user["id"], hero["id"]),
             )
         pulls.append({**serialize_hero(hero), "isNew": is_new})
 
     new_coins = user["coins"] - cost
     cursor.execute(
-        "UPDATE users SET coins = ? WHERE id = ?", (new_coins, user["id"])
+        "UPDATE users SET coins = %s WHERE id = %s", (new_coins, user["id"])
     )
     conn.commit()
 

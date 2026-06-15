@@ -29,7 +29,7 @@ def list_achievements(conn=Depends(get_conn)):
 def my_achievements(user=Depends(get_current_user), conn=Depends(get_conn)):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = ?",
+        "SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = %s",
         (user["id"],),
     )
     return [

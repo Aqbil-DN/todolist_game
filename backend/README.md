@@ -1,16 +1,16 @@
-# TodoList Game — Backend (FastAPI + pyodbc + Firebase)
+# TodoList Game — Backend (FastAPI + PostgreSQL + Firebase)
 
 FastAPI service backing the cyberpunk todo-game frontend. Data lives in
-**Azure Database for MySQL** (accessed via **pyodbc**) and authentication is
-handled with **Firebase Auth** (the client signs in, the backend verifies the
+**PostgreSQL** (e.g. **Supabase**, accessed via **psycopg2**) and authentication
+is handled with **Firebase Auth** (the client signs in, the backend verifies the
 ID token on every request).
 
 ## Prerequisites
 
 1. **Python 3.10+**
-2. **MySQL Connector/ODBC 8.x (Unicode) driver** installed and visible to the
-   ODBC Driver Manager. The `DRIVER={...}` name in your connection string must
-   match the installed driver exactly.
+2. A **PostgreSQL database**. [Supabase](https://supabase.com/) works out of the
+   box — grab the connection string from **Project Settings → Database**.
+   PostgreSQL is UTF-8 by default, so the emoji catalog data is preserved.
 3. A **Firebase project** and a **service-account JSON** key (Project Settings →
    Service accounts → Generate new private key).
 
@@ -27,9 +27,16 @@ Copy-Item .env.example .env   # then edit .env with real values
 
 Edit `.env`:
 
-- `PYODBC_CONNECTION_STRING` — full ODBC connection string for your Azure MySQL
-  instance. Keep `CHARSET=utf8mb4` (emoji-safe) and `SSLMODE=REQUIRED` (Azure
-  requires TLS).
+- `DATABASE_URL` — PostgreSQL connection URL. Supabase requires TLS, so append
+  `?sslmode=require`.
+  - **Direct** (IPv6-only):
+    `postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require`
+  - **Session pooler** (use this on IPv4-only networks; note the
+    `postgres.<project-ref>` username):
+    `postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require`
+
+  Find both strings in the dashboard under **Project Settings → Database →
+  Connection pooling**.
 - `FIREBASE_CREDENTIALS_FILE` — path to your Firebase service-account JSON.
 - `CORS_ORIGINS` — the Vite dev origin(s), comma-separated.
 

@@ -1,18 +1,19 @@
 -- ===========================================================================
--- TodoList Game - MySQL seed data
+-- TodoList Game - PostgreSQL seed data
 -- Catalog data mirrored from the frontend (character classes, hero roster,
--- achievement list). Uses INSERT IGNORE so it is safe to re-run.
+-- achievement list). Uses ON CONFLICT DO NOTHING so it is safe to re-run.
 -- Run data/schema.sql first.
 -- ===========================================================================
 
 -- --- Character classes -----------------------------------------------------
-INSERT IGNORE INTO character_classes (id, name, stat_int, stat_vit, stat_agi, color) VALUES
+INSERT INTO character_classes (id, name, stat_int, stat_vit, stat_agi, color) VALUES
 ('hacker', 'CYBER HACKER', 8, 4, 6, '#5CE1E6'),
 ('artist', 'NEON ARTIST', 6, 5, 7, '#FF5DA2'),
-('hustler', 'STREET SAMURAI', 5, 8, 5, '#FFD60A');
+('hustler', 'STREET SAMURAI', 5, 8, 5, '#FFD60A')
+ON CONFLICT (id) DO NOTHING;
 
 -- --- Heroes (15 Neural Net Idols) ------------------------------------------
-INSERT IGNORE INTO heroes (id, name, title, rarity, color, glow, emoji, img, description) VALUES
+INSERT INTO heroes (id, name, title, rarity, color, glow, emoji, img, description) VALUES
 ('001', 'OMEGA', 'THE SOVEREIGN AI', 'LEGENDARY', '#FF003C', '#FFD60A', '👑', '01.png', 'Master Taskmaster. Rules the digital void with absolute efficiency. Grants immense XP boosts.'),
 ('002', 'KAIRO', 'THE CHRONO-WITCH', 'EPIC', '#9D4EDD', '#FF5DA2', '⏳', '02.png', 'Focus Arena Master. Bends time to maximize deep work sessions. Slows down distraction timers.'),
 ('003', 'CYPHER', 'THE GHOST NETRUNNER', 'EPIC', '#00B4FF', '#9D4EDD', '🥷', '03.png', 'AI Oracle Agent. Navigates the data streams unseen. Reveals hidden sub-quests.'),
@@ -27,10 +28,11 @@ INSERT IGNORE INTO heroes (id, name, title, rarity, color, glow, emoji, img, des
 ('012', 'DRIFT', 'THE SYNTHWAVE RACER', 'RARE', '#FF5DA2', '#FFD60A', '🏎️', '12.png', 'Speed Organizer. Accelerates through daily repetitive tasks at terminal velocity.'),
 ('013', 'ECHO', 'THE SOUND-TRACKER', 'RARE', '#5CE1E6', '#5CE1E6', '🎧', '13.png', 'Focus Beats. Drowns out real-world distractions with heavy cyber-bass.'),
 ('014', 'LOOP', 'THE HABIT-BOT', 'RARE', '#A3FF12', '#FF5DA2', '🤖', '14.png', 'Consistency Drone. Automates repetitive thought processes without fatigue.'),
-('015', 'SPARK', 'THE IDEA-COLLECTOR', 'RARE', '#FFD60A', '#00B4FF', '💡', '15.png', 'Note Taker. Captures fleeting thoughts before they dissolve into the void.');
+('015', 'SPARK', 'THE IDEA-COLLECTOR', 'RARE', '#FFD60A', '#00B4FF', '💡', '15.png', 'Note Taker. Captures fleeting thoughts before they dissolve into the void.')
+ON CONFLICT (id) DO NOTHING;
 
 -- --- Achievements (50 regular + 2 secret) ----------------------------------
-INSERT IGNORE INTO achievements (id, title, description, emoji, color, category, is_secret) VALUES
+INSERT INTO achievements (id, title, description, emoji, color, category, is_secret) VALUES
 (1, 'FIRST BLOOD', 'Selesaikan 1 Quest pertama.', '🔪', '#A3FF12', 'QUESTS & TASKS', 0),
 (2, 'TASK SLAYER', 'Selesaikan 10 Quest.', '⚔️', '#A3FF12', 'QUESTS & TASKS', 0),
 (3, 'QUEST KNIGHT', 'Selesaikan 50 Quest.', '🛡️', '#A3FF12', 'QUESTS & TASKS', 0),
@@ -82,4 +84,5 @@ INSERT IGNORE INTO achievements (id, title, description, emoji, color, category,
 (49, 'OVERCLOCKER', 'Dapatkan 1000 XP dalam satu hari.', '🚀', '#6A4CFF', 'SYSTEM & ORACLE', 0),
 (50, 'SECOND BRAIN', 'Selesaikan 100% dari semua 49 Achievement.', '🧠', '#6A4CFF', 'SYSTEM & ORACLE', 0),
 (99, 'GHOST IN THE MACHINE', 'Temukan pesan rahasia di dalam source code sistem.', '👁️', '#FF003C', 'CLASSIFIED ANOMALIES', 1),
-(100, 'NIGHTMARE MODE', 'Selesaikan 5 Boss Arena berturut-turut tanpa gagal.', '🩸', '#FF003C', 'CLASSIFIED ANOMALIES', 1);
+(100, 'NIGHTMARE MODE', 'Selesaikan 5 Boss Arena berturut-turut tanpa gagal.', '🩸', '#FF003C', 'CLASSIFIED ANOMALIES', 1)
+ON CONFLICT (id) DO NOTHING;

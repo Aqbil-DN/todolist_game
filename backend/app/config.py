@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables / the .env file."""
 
-    pyodbc_connection_string: str = ""
+    database_url: str = ""
     firebase_credentials_file: str | None = None
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

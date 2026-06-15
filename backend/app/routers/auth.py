@@ -30,14 +30,14 @@ def register(
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id FROM users WHERE player_tag = ? AND id <> ?",
+        "SELECT id FROM users WHERE player_tag = %s AND id <> %s",
         (payload.player_tag, user["id"]),
     )
     if fetch_one(cursor):
         raise HTTPException(status_code=409, detail="Player tag already taken")
 
     cursor.execute(
-        "SELECT color FROM character_classes WHERE id = ?", (payload.class_id,)
+        "SELECT color FROM character_classes WHERE id = %s", (payload.class_id,)
     )
     class_row = fetch_one(cursor)
     color = class_row["color"] if class_row else "#A3FF12"
@@ -47,15 +47,15 @@ def register(
     cursor.execute(
         """
         UPDATE users
-        SET player_tag = ?, class_id = ?, title = ?, color = ?, email = ?
-        WHERE id = ?
+        SET player_tag = %s, class_id = %s, title = %s, color = %s, email = %s
+        WHERE id = %s
         """,
         (payload.player_tag, payload.class_id, title, color, email, user["id"]),
     )
     cursor.execute(
         """
         INSERT INTO notifications (user_id, type, title, message, color)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (
             user["id"],
@@ -67,5 +67,5 @@ def register(
     )
     conn.commit()
 
-    cursor.execute("SELECT * FROM users WHERE id = ?", (user["id"],))
+    cursor.execute("SELECT * FROM users WHERE id = %s", (user["id"],))
     return serialize_user(fetch_one(cursor))
