@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, User, Mail, Key, Monitor, 
-  Paintbrush, Crosshair, Sparkles, Zap, Shield, Loader2
+  ArrowLeft, User, Monitor, 
+  Paintbrush, Crosshair, Loader2
 } from 'lucide-react';
 
 export default function CreateCharacterApp() {
   const navigate = useNavigate();
   const [selectedClass, setSelectedClass] = useState('hacker');
   const [playerTag, setPlayerTag] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isForging, setIsForging] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -48,8 +46,8 @@ export default function CreateCharacterApp() {
 
   const handleForgeCharacter = (e) => {
     e.preventDefault();
-    if (!playerTag || !email || !password) {
-      setErrorMessage('SYSTEM ERROR: ALL FIELDS REQUIRED TO FORGE.');
+    if (!playerTag) {
+      setErrorMessage('SYSTEM ERROR: PLAYER TAG REQUIRED TO FORGE.');
       return;
     }
     if (playerTag.length < 3) {
@@ -60,7 +58,7 @@ export default function CreateCharacterApp() {
     setErrorMessage('');
     setIsForging(true);
     
-    // Simulate API Call for Registration
+    // Simulate Google OAuth flow for Registration
     setTimeout(() => {
       navigate('/');
     }, 2500);
@@ -276,54 +274,18 @@ export default function CreateCharacterApp() {
           )}
 
           <form onSubmit={handleForgeCharacter} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Player Tag */}
-              <div>
-                <label className="block font-pixel text-[10px] text-[#5CE1E6] mb-2">PLAYER TAG (USERNAME)</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-                  <input 
-                    type="text" 
-                    value={playerTag}
-                    onChange={(e) => setPlayerTag(e.target.value)}
-                    placeholder="Enter Alias..."
-                    maxLength={15}
-                    className="w-full arcade-input py-4 pl-12 pr-4 font-vt text-2xl rounded-lg transition-colors"
-                    style={{ color: activeClass.color }}
-                    disabled={isForging}
-                  />
-                </div>
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block font-pixel text-[10px] text-[#5CE1E6] mb-2">TRANSMISSION (EMAIL)</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-                  <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="player@arcade.com"
-                    className="w-full arcade-input py-4 pl-12 pr-4 font-vt text-2xl rounded-lg transition-colors"
-                    style={{ color: activeClass.color }}
-                    disabled={isForging}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Password */}
+            {/* Player Tag */}
             <div>
-              <label className="block font-pixel text-[10px] text-[#5CE1E6] mb-2">SECRET CIPHER (PASSWORD)</label>
+              <label className="block font-pixel text-[10px] text-[#5CE1E6] mb-2">PLAYER TAG (USERNAME)</label>
               <div className="relative">
-                <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
                 <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full arcade-input py-4 pl-12 pr-4 font-vt text-2xl tracking-widest rounded-lg transition-colors"
+                  type="text" 
+                  value={playerTag}
+                  onChange={(e) => setPlayerTag(e.target.value)}
+                  placeholder="Enter Alias..."
+                  maxLength={15}
+                  className="w-full arcade-input py-4 pl-12 pr-4 font-vt text-2xl rounded-lg transition-colors"
                   style={{ color: activeClass.color }}
                   disabled={isForging}
                 />
@@ -333,9 +295,8 @@ export default function CreateCharacterApp() {
             <button 
               type="submit"
               disabled={isForging}
-              className="w-full text-black font-pixel text-xs md:text-sm py-5 px-6 btn-comic flex items-center justify-center gap-3 border-2 border-white mt-8 disabled:opacity-70 disabled:transform-none disabled:shadow-none transition-colors"
+              className="w-full bg-white text-black font-pixel text-xs md:text-sm py-5 px-6 btn-comic flex items-center justify-center gap-3 border-2 border-black mt-8 disabled:opacity-70 disabled:transform-none disabled:shadow-none transition-colors"
               style={{ 
-                backgroundColor: activeClass.color, 
                 boxShadow: !isForging ? `6px 6px 0px 0px ${activeClass.color}` : 'none'
               }}
             >
@@ -345,7 +306,7 @@ export default function CreateCharacterApp() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-5 h-5" /> FORGE CHARACTER
+                  <span className="font-sans font-bold text-xl">G</span> SIGN UP WITH GOOGLE
                 </>
               )}
             </button>

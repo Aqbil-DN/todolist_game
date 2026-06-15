@@ -4,7 +4,6 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import EnterSystem from './pages/EnterSystem';
 import Dashboard from './pages/Dashboard';
-import Arena from './pages/Arena';
 import Achievements from './pages/Achievements';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
@@ -22,7 +21,6 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/enter" element={<EnterSystem />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/arena" element={<Arena />} />
         <Route path="/achievements" element={<Achievements />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />

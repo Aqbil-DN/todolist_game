@@ -132,6 +132,10 @@ export default function EnterSystemApp() {
         100% { transform: scale(20); opacity: 0; border-width: 1px; }
       }
       .animate-portal { animation: portalExpand 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+
+      /* Hide scrollbar while keeping scroll behavior */
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
     `}} />
   );
 
@@ -171,7 +175,7 @@ export default function EnterSystemApp() {
             <span className="font-pixel text-[10px] text-[#A3FF12]">SB_KERNEL_TERMINAL</span>
           </div>
           
-          <div className="flex-1 overflow-y-auto space-y-2 font-vt text-2xl tracking-wider text-[#A3FF12] drop-shadow-[0_0_2px_#A3FF12]">
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-2 font-vt text-2xl tracking-wider text-[#A3FF12] drop-shadow-[0_0_2px_#A3FF12]">
             {displayedLogs.map((log, index) => (
               <div key={index} className="flex gap-4">
                 <span className="opacity-50">[{new Date().toISOString().split('T')[1].slice(0,8)}]</span>

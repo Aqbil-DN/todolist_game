@@ -1,13 +1,81 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, CheckSquare, Timer, BookOpen, Sparkles,
+  LayoutDashboard, CheckSquare,
   User, Flame, Zap, Trophy, Bell, Search, Hexagon,
-  Target, Activity, ChevronRight, Shield, Cpu, Swords, Loader2
+  Target, Activity, ChevronRight, ChevronLeft, Calendar, X, Shield, Cpu, Coins
 } from 'lucide-react';
+import { useCoins } from '../useCoins';
+
+// Quest frequency categories (per-card, editable in edit mode)
+const FREQUENCIES = [
+  { key: 'daily', label: 'DAILY', color: '#5CE1E6' },
+  { key: 'weekly', label: 'WEEKLY', color: '#A3FF12' },
+  { key: 'monthly', label: 'MONTHLY', color: '#FFD60A' },
+  { key: 'yearly', label: 'YEARLY', color: '#6A4CFF' },
+  { key: 'one-time', label: 'ONE-TIME', color: '#FF5DA2' },
+];
+
+// Task categories (chosen when adding a quest -> sets tag + color)
+const CATEGORIES = [
+  { tag: 'HEALTH', color: '#FF5DA2' },
+  { tag: 'WORK', color: '#FFD60A' },
+  { tag: 'LEARN', color: '#5CE1E6' },
+  { tag: 'FITNESS', color: '#A3FF12' },
+  { tag: 'CHORES', color: '#6A4CFF' },
+  { tag: 'MISC', color: '#00B4FF' },
+];
+
+const WEEKDAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+// --- Date helpers (local-time, TZ-safe) ---
+const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+
+// Build a 6x7 grid of dates for a given month (incl. spillover from neighbouring months)
+const buildMonthMatrix = (year, month) => {
+  const first = new Date(year, month, 1);
+  const start = addDays(first, -first.getDay()); // back up to the Sunday of that week
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = addDays(start, i);
+    return { date, inMonth: date.getMonth() === month };
+  });
+};
+
+// Does a quest's recurrence land on the given day, based on its anchor date?
+const isHighlighted = (quest, day) => {
+  if (!quest?.date) return false;
+  const anchor = parseISO(quest.date);
+  switch (quest.frequency) {
+    case 'daily': return true;
+    case 'weekly': return day.getDay() === anchor.getDay();
+    case 'monthly': return day.getDate() === anchor.getDate();
+    case 'yearly': return day.getMonth() === anchor.getMonth() && day.getDate() === anchor.getDate();
+    case 'one-time': return sameDay(day, anchor);
+    default: return false;
+  }
+};
+
+// Human-readable description of a quest's recurrence pattern
+const recurrenceHint = (quest) => {
+  if (!quest?.date) return '';
+  const a = parseISO(quest.date);
+  switch (quest.frequency) {
+    case 'daily': return 'Highlights every day';
+    case 'weekly': return `Highlights every ${WEEKDAY_LABELS[a.getDay()]}`;
+    case 'monthly': return `Highlights day ${a.getDate()} of every month`;
+    case 'yearly': return `Highlights ${MONTH_LABELS[a.getMonth()]} ${a.getDate()} each year`;
+    case 'one-time': return `One-time on ${MONTH_LABELS[a.getMonth()]} ${a.getDate()}, ${a.getFullYear()}`;
+    default: return '';
+  }
+};
 
 export default function DashboardApp() {
   const navigate = useNavigate();
+  const { coins, addCoins } = useCoins();
   const [playerXP, setPlayerXP] = useState(1240);
   const [playerLevel, setPlayerLevel] = useState(24);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -16,41 +84,29 @@ export default function DashboardApp() {
 
   // Main Quests State
   const [quests, setQuests] = useState([
-    { id: 1, title: 'Drink 2L of Water', xp: 15, tag: 'HEALTH', color: '#FF5DA2', completed: false },
-    { id: 2, title: 'Finish Dashboard UI Component', xp: 100, tag: 'WORK', color: '#FFD60A', completed: false },
-    { id: 3, title: 'Read 10 pages of Atomic Habits', xp: 25, tag: 'LEARN', color: '#5CE1E6', completed: false },
-    { id: 4, title: '30 Min Cardio Workout', xp: 50, tag: 'FITNESS', color: '#A3FF12', completed: true },
+    { id: 1, title: 'Drink 2L of Water', xp: 15, tag: 'HEALTH', color: '#FF5DA2', frequency: 'daily', date: toISO(new Date()), completed: false },
+    { id: 2, title: 'Finish Dashboard UI Component', xp: 100, tag: 'WORK', color: '#FFD60A', frequency: 'one-time', date: toISO(addDays(new Date(), 3)), completed: false },
+    { id: 3, title: 'Read 10 pages of Atomic Habits', xp: 25, tag: 'LEARN', color: '#5CE1E6', frequency: 'daily', date: toISO(new Date()), completed: false },
+    { id: 4, title: '30 Min Cardio Workout', xp: 50, tag: 'FITNESS', color: '#A3FF12', frequency: 'weekly', date: toISO(new Date()), completed: true },
   ]);
 
-  // AI Bardify (Quests) State
+  // Quest creation + edit State
   const [newTaskInput, setNewTaskInput] = useState('');
-  const [isBardLoading, setIsBardLoading] = useState(false);
-
-  // AI Boss Summoner (Focus Arena) State
-  const [focusTask, setFocusTask] = useState('');
-  const [isBossLoading, setIsBossLoading] = useState(false);
-  const [bossData, setBossData] = useState(null);
-
-  // AI Alchemist (Journal) State
-  const [journalInput, setJournalInput] = useState('');
-  const [isJournalLoading, setIsJournalLoading] = useState(false);
-  const [journalResult, setJournalResult] = useState(null);
-  const [journalError, setJournalError] = useState('');
-
-  // AI Oracle State
-  const [aiInput, setAiInput] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiQuests, setAiQuests] = useState([]);
-  const [aiError, setAiError] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState('HEALTH');
+  const [editMode, setEditMode] = useState(false);
+  const [selectedQuestId, setSelectedQuestId] = useState(null);
+  const [calendarMonth, setCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
 
   const handleCompleteQuest = (e, quest) => {
+    if (editMode) return; // No completing while editing
     if (quest.completed) return; // Prevent double completion
 
     // 1. Mark as complete
     setQuests(quests.map(q => q.id === quest.id ? { ...q, completed: true } : q));
 
-    // 2. Add XP
+    // 2. Add XP + coins (coins = same amount as XP, spendable on Gacha)
     setPlayerXP(prev => prev + quest.xp);
+    addCoins(quest.xp);
 
     // 3. Create floating XP text at mouse click coordinates
     const rect = e.currentTarget.getBoundingClientRect();
@@ -72,177 +128,19 @@ export default function DashboardApp() {
 
   const addNormalTask = () => {
     if (!newTaskInput.trim()) return;
-    const newQuest = { id: Date.now(), title: newTaskInput, xp: 15, tag: 'MISC', color: '#ffffff', completed: false };
+    const category = CATEGORIES.find(c => c.tag === newTaskCategory) || CATEGORIES[0];
+    const newQuest = { id: Date.now(), title: newTaskInput, xp: 15, tag: category.tag, color: category.color, frequency: 'daily', date: toISO(new Date()), completed: false };
     setQuests(prev => [newQuest, ...prev]);
     setNewTaskInput('');
   };
 
-  const bardifyTask = async () => {
-    if (!newTaskInput.trim()) return;
-    setIsBardLoading(true);
-
-    const apiKey = ""; // Injected by environment
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-    const prompt = `You are a dramatic RPG Bard. Turn this mundane task: "${newTaskInput}" into an epic, gamified quest. Return a JSON object with: 't' (the epic quest title, max 60 chars), 'xp' (integer 10-100 based on estimated difficulty), 'tag' (1-word category like CHORES, WORK, HEALTH, BATTLE), and 'color' (a hex code matching the vibe, e.g. #5CE1E6, #FF5DA2, #A3FF12, #FFD60A, #6A4CFF).`;
-
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            t: { type: "STRING" },
-            xp: { type: "INTEGER" },
-            tag: { type: "STRING" },
-            color: { type: "STRING" }
-          }
-        }
-      }
-    };
-
-    try {
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await response.json();
-      const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
-      const newQuest = { id: Date.now(), title: parsed.t, xp: parsed.xp, tag: parsed.tag, color: parsed.color, completed: false };
-      setQuests(prev => [newQuest, ...prev]);
-      setNewTaskInput('');
-    } catch (error) {
-      addNormalTask();
-    }
-    setIsBardLoading(false);
+  const changeFrequency = (id, frequency) => {
+    setQuests(prev => prev.map(q => q.id === id ? { ...q, frequency } : q));
   };
 
-  const summonBoss = async () => {
-    if (!focusTask.trim()) return;
-    setIsBossLoading(true);
-
-    const apiKey = ""; // Injected by environment
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-    const prompt = `The player is entering a 25-minute deep focus arena to work on: "${focusTask}". Invent a creative, retro-arcade cyberpunk RPG Boss Monster they are battling by doing this work. Return a JSON object with: 'name' (string, max 30 chars), 'desc' (string, short 1-sentence flavor text), 'emoji' (string, a single emoji representing the boss like 👾, 🐉, 🤖, 🦠), and 'color' (a hex code matching its vibe, e.g., #FF5DA2, #FFD60A, #5CE1E6, #A3FF12, #6A4CFF).`;
-
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            name: { type: "STRING" },
-            desc: { type: "STRING" },
-            emoji: { type: "STRING" },
-            color: { type: "STRING" }
-          }
-        }
-      }
-    };
-
-    try {
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await response.json();
-      const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
-      setBossData(parsed);
-    } catch (error) {
-      console.error("Failed to summon boss", error);
-    }
-    setIsBossLoading(false);
-  };
-
-  const analyzeMood = async () => {
-    if (!journalInput.trim()) return;
-    setIsJournalLoading(true);
-    setJournalError('');
-    setJournalResult(null);
-
-    const apiKey = ""; // Injected by environment
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-    const prompt = `You are an RPG 'Energy Alchemist' analyzing a player's real-life journal entry. Based on their entry: "${journalInput}", determine their current mental state. Return a reading (a short, 1-2 sentence in-character RPG-style assessment of their energy), an auraColor (a hex color representing their mood, e.g., #5CE1E6, #FF5DA2, #A3FF12, #FFD60A, #6A4CFF), and stats (an array of 3 RPG stat modifications based on their mood, e.g., {name: 'FOCUS', value: '+10'}, {name: 'STAMINA', value: '-5'}).`;
-
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            reading: { type: "STRING" },
-            auraColor: { type: "STRING" },
-            stats: {
-              type: "ARRAY",
-              items: { type: "OBJECT", properties: { name: { type: "STRING" }, value: { type: "STRING" } } }
-            }
-          }
-        }
-      }
-    };
-
-    let retries = 0;
-    while (retries <= 3) {
-      try {
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
-        setJournalResult(parsed);
-        break;
-      } catch (error) {
-        retries++;
-        if (retries > 3) setJournalError('The Alchemist is gathering herbs. Please try again later.');
-        else await new Promise(r => setTimeout(r, Math.pow(2, retries - 1) * 1000));
-      }
-    }
-    setIsJournalLoading(false);
-  };
-
-  const generateQuests = async () => {
-    if (!aiInput.trim()) return;
-    setIsAiLoading(true);
-    setAiError('');
-
-    const apiKey = ""; // Injected by environment
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-    const prompt = `Break down this large goal into 3 to 4 smaller, actionable gamified quests: "${aiInput}". Assign suitable XP (10-100) and a short 1-word tag (e.g. FOCUS, HEALTH, CODE, LORE) and a hex color code matching the tag's vibe (e.g. #5CE1E6, #FF5DA2, #A3FF12, #FFD60A, #6A4CFF).`;
-
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            quests: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: { t: { type: "STRING" }, xp: { type: "INTEGER" }, tag: { type: "STRING" }, color: { type: "STRING" } }
-              }
-            }
-          }
-        }
-      }
-    };
-
-    let retries = 0;
-    while (retries <= 3) {
-      try {
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
-        setAiQuests(parsed.quests || []);
-        break;
-      } catch (error) {
-        retries++;
-        if (retries > 3) setAiError('The Oracle is meditating. Please try again later.');
-        else await new Promise(r => setTimeout(r, Math.pow(2, retries - 1) * 1000));
-      }
-    }
-    setIsAiLoading(false);
+  const changeDate = (id, iso) => {
+    setQuests(prev => prev.map(q => q.id === id ? { ...q, date: iso } : q));
+    setSelectedQuestId(id);
   };
 
   const CustomStyles = () => (
@@ -334,6 +232,8 @@ export default function DashboardApp() {
     `}} />
   );
 
+  const selectedQuest = quests.find(q => q.id === selectedQuestId) || null;
+
   return (
     <div className="h-screen w-full bg-[#0D0D0D] crt pixel-grid flex overflow-hidden selection:bg-[#FFD60A] selection:text-black">
       <CustomStyles />
@@ -376,24 +276,6 @@ export default function DashboardApp() {
             className={`w-full flex items-center gap-4 p-3 rounded transition-all font-vt text-2xl group ${activeTab === 'quests' ? 'bg-[#5CE1E6] text-black comic-shadow-pink transform translate-x-2' : 'text-white hover:text-[#5CE1E6] hover:bg-[#00B4FF]/10'}`}>
             <CheckSquare className="w-6 h-6 group-hover:scale-110 transition-transform" /> Quests
           </button>
-
-          <button
-            onClick={() => setActiveTab('arena')}
-            className={`w-full flex items-center gap-4 p-3 rounded transition-all font-vt text-2xl group ${activeTab === 'arena' ? 'bg-[#FF5DA2] text-black comic-shadow-yellow transform translate-x-2' : 'text-white hover:text-[#FF5DA2] hover:bg-[#FF5DA2]/10'}`}>
-            <Timer className="w-6 h-6 group-hover:scale-110 transition-transform" /> Focus Arena
-          </button>
-
-          <button
-            onClick={() => setActiveTab('journal')}
-            className={`w-full flex items-center gap-4 p-3 rounded transition-all font-vt text-2xl group ${activeTab === 'journal' ? 'bg-[#A3FF12] text-black comic-shadow-cyan transform translate-x-2' : 'text-white hover:text-[#A3FF12] hover:bg-[#A3FF12]/10'}`}>
-            <BookOpen className="w-6 h-6 group-hover:scale-110 transition-transform" /> Journal
-          </button>
-
-          <button
-            onClick={() => setActiveTab('oracle')}
-            className={`w-full flex items-center gap-4 p-3 rounded transition-all font-vt text-2xl group mt-8 border ${activeTab === 'oracle' ? 'bg-[#6A4CFF] text-white comic-shadow-yellow transform translate-x-2 border-[#6A4CFF]' : 'text-[#FFD60A] hover:bg-[#FFD60A]/10 border-[#FFD60A]/30'}`}>
-            <Sparkles className="w-6 h-6 group-hover:animate-spin" /> AI Oracle
-          </button>
         </div>
 
         <div className="mt-auto pt-6 border-t-2 border-[#00B4FF]/30">
@@ -425,6 +307,11 @@ export default function DashboardApp() {
           </div>
 
           <div className="flex items-center gap-6">
+            <div onClick={() => navigate('/gacha')} className="flex items-center gap-2 bg-[#FFD60A]/10 border border-[#FFD60A] px-3 py-1 rounded-full cursor-pointer hover:bg-[#FFD60A]/20 transition-colors" title="Spend coins on Gacha">
+              <Coins className="w-4 h-4 text-[#FFD60A]" />
+              <span className="font-vt text-xl text-[#FFD60A]">{coins.toLocaleString()}</span>
+            </div>
+
             <div className="flex items-center gap-2 bg-[#FF9F1C]/10 border border-[#FF9F1C] px-3 py-1 rounded-full cursor-pointer hover:bg-[#FF9F1C]/20 transition-colors">
               <Flame className="w-4 h-4 text-[#FF9F1C]" />
               <span className="font-vt text-xl text-[#FF9F1C]">14 <span className="hidden md:inline">Days</span></span>
@@ -475,13 +362,13 @@ export default function DashboardApp() {
                   <div>
                     <div className="flex justify-between items-end mb-4 border-b-2 border-[#00B4FF]/30 pb-2">
                       <h3 className="font-pixel text-lg text-[#FFD60A] drop-shadow-[0_0_5px_#FFD60A] flex items-center gap-3">
-                        <Target className="w-5 h-5" /> DAILY QUESTS
+                        <Target className="w-5 h-5" /> ACTIVE QUESTS
                       </h3>
                       <button onClick={() => setActiveTab('quests')} className="font-vt text-lg text-[#00B4FF] hover:text-[#5CE1E6]">View All</button>
                     </div>
 
                     <div className="space-y-4">
-                      {quests.slice(0, 4).map((quest) => (
+                      {quests.filter(q => !q.completed).slice(0, 3).map((quest) => (
                         <div key={quest.id} onClick={(e) => handleCompleteQuest(e, quest)} className={`quest-card relative bg-black/60 border-2 rounded-xl p-4 md:p-5 flex items-center justify-between cursor-pointer group ${quest.completed ? 'completed' : ''}`} style={{ borderColor: quest.completed ? '#333' : `${quest.color}50` }}>
                           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
                           <div className="flex items-center gap-4 md:gap-6 relative z-10 w-full">
@@ -511,8 +398,16 @@ export default function DashboardApp() {
                     <h3 className="font-pixel text-xl text-[#5CE1E6] drop-shadow-[0_0_5px_#5CE1E6] flex items-center gap-3">
                       <Target className="w-6 h-6" /> ACTIVE QUESTS
                     </h3>
-                    <div className="bg-[#5CE1E6]/20 text-[#5CE1E6] px-4 py-2 font-vt text-xl rounded-full border border-[#5CE1E6]">
-                      {quests.filter(q => q.completed).length}/{quests.length} DONE
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => { setEditMode(!editMode); if (editMode) setSelectedQuestId(null); }}
+                        className={`font-pixel text-[10px] px-4 py-2 rounded-full border-2 transition-all ${editMode ? 'bg-[#FFD60A] text-black border-white comic-shadow-pink' : 'bg-transparent text-[#FFD60A] border-[#FFD60A] hover:bg-[#FFD60A]/10'}`}
+                      >
+                        {editMode ? 'DONE' : 'EDIT'}
+                      </button>
+                      <div className="bg-[#5CE1E6]/20 text-[#5CE1E6] px-4 py-2 font-vt text-xl rounded-full border border-[#5CE1E6]">
+                        {quests.filter(q => q.completed).length}/{quests.length} DONE
+                      </div>
                     </div>
                   </div>
 
@@ -526,201 +421,167 @@ export default function DashboardApp() {
                       onKeyDown={(e) => e.key === 'Enter' && addNormalTask()}
                     />
                     <div className="flex gap-2">
-                      <button
-                        onClick={bardifyTask}
-                        disabled={isBardLoading || !newTaskInput.trim()}
-                        className="bg-[#A3FF12] text-black font-pixel text-[10px] px-6 py-3 md:py-0 rounded-lg comic-shadow-pink hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center border-2 border-white"
+                      <select
+                        value={newTaskCategory}
+                        onChange={(e) => setNewTaskCategory(e.target.value)}
+                        className="bg-black border-2 border-[#00B4FF] text-white font-pixel text-[10px] px-4 py-3 md:py-0 rounded-lg focus:outline-none focus:border-[#A3FF12] cursor-pointer"
                       >
-                        {isBardLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "BARDIFY ✨"}
-                      </button>
+                        {CATEGORIES.map(c => (
+                          <option key={c.tag} value={c.tag}>{c.tag}</option>
+                        ))}
+                      </select>
                       <button
                         onClick={addNormalTask}
-                        disabled={!newTaskInput.trim() || isBardLoading}
-                        className="bg-transparent text-[#00B4FF] font-pixel text-[10px] px-4 rounded-lg hover:bg-[#00B4FF]/20 transition-colors border-2 border-[#00B4FF]"
+                        disabled={!newTaskInput.trim()}
+                        className="bg-[#A3FF12] text-black font-pixel text-[10px] px-6 py-3 md:py-0 rounded-lg comic-shadow-pink hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center border-2 border-white"
                       >
                         ADD
                       </button>
                     </div>
                   </div>
 
-                  <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-                    {quests.map((quest) => (
-                      <div key={quest.id} onClick={(e) => handleCompleteQuest(e, quest)} className={`quest-card relative bg-black/60 border-2 rounded-xl p-5 flex items-center justify-between cursor-pointer group ${quest.completed ? 'completed' : ''}`} style={{ borderColor: quest.completed ? '#333' : `${quest.color}50` }}>
-                        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
-                        <div className="flex items-center gap-6 relative z-10 w-full">
-                          <div className="w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{ borderColor: quest.completed ? '#666' : quest.color, backgroundColor: quest.completed ? '#222' : 'transparent', color: quest.completed ? '#A3FF12' : 'transparent' }}>
-                            <CheckSquare className="w-5 h-5" />
+                  <div className="space-y-6 overflow-y-auto flex-1 pr-2">
+                    {FREQUENCIES.map((freq) => {
+                      const group = quests.filter(q => q.frequency === freq.key);
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={freq.key}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="font-pixel text-[10px] tracking-widest" style={{ color: freq.color, textShadow: `0 0 5px ${freq.color}` }}>{freq.label}</span>
+                            <div className="flex-1 h-px" style={{ backgroundColor: `${freq.color}40` }}></div>
+                            <span className="font-vt text-lg" style={{ color: freq.color }}>{group.length}</span>
                           </div>
-                          <div className="flex-1 relative">
-                            <div className={`font-sans font-bold text-lg transition-colors ${quest.completed ? 'text-white/40' : 'text-white group-hover:text-white/90'}`}>
-                              {quest.title} {quest.completed && <div className="strike-line"></div>}
-                            </div>
-                            <div className="font-pixel text-[8px] mt-2 tracking-wider" style={{ color: quest.completed ? '#666' : quest.color }}>{quest.tag}</div>
-                          </div>
-                          <div className="font-vt text-3xl shrink-0" style={{ color: quest.completed ? '#666' : quest.color }}>+{quest.xp} XP</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              { }
-              {activeTab === 'arena' && (
-                <div className="animate-pop h-full flex flex-col items-center justify-center relative p-8 maze-wall bg-black/40 border-[#FF5DA2]/50 shadow-[0_0_20px_rgba(255,93,162,0.1)] rounded-2xl overflow-hidden">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#FF5DA2]/10 rounded-full blur-[80px] animate-pulse pointer-events-none"></div>
-
-                  {!bossData ? (
-                    <div className="relative z-20 flex flex-col items-center max-w-md w-full">
-                      <div className="w-16 h-16 bg-[#FF5DA2] text-black flex items-center justify-center rounded-2xl mb-6 shadow-[0_0_15px_#FF5DA2] transform rotate-12">
-                        <Swords className="w-8 h-8" />
-                      </div>
-                      <h3 className="font-pixel text-xl text-[#FF5DA2] mb-4 drop-shadow-[0_0_8px_#FF5DA2] text-center">SUMMON A BOSS</h3>
-                      <p className="font-sans text-base text-center text-white/70 mb-8">What are you focusing on? The AI will generate a boss for you to defeat during this 25m session.</p>
-                      <input
-                        type="text"
-                        value={focusTask}
-                        onChange={(e) => setFocusTask(e.target.value)}
-                        placeholder="e.g. Study Calculus, Write Emails..."
-                        className="w-full bg-black border-2 border-[#00B4FF] p-4 rounded-xl font-sans text-sm text-white focus:outline-none focus:border-[#FFD60A] hover:shadow-[0_0_10px_#00B4FF] transition-all mb-6 text-center"
-                        onKeyDown={(e) => e.key === 'Enter' && summonBoss()}
-                      />
-                      <button
-                        onClick={summonBoss}
-                        disabled={isBossLoading || !focusTask.trim()}
-                        className="bg-[#FF5DA2] text-black font-pixel text-xs py-4 px-8 comic-shadow-yellow hover:-translate-y-1 transition-transform border-2 border-white w-full flex items-center justify-center disabled:opacity-50 disabled:hover:translate-y-0"
-                      >
-                        {isBossLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : "GENERATE ENEMY ✨"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="relative z-20 flex flex-col items-center bg-black/80 border-4 p-12 rounded-2xl shadow-2xl" style={{ borderColor: bossData.color, boxShadow: `0 0 30px ${bossData.color}40` }}>
-                      <div className="text-8xl mb-6 animate-bounce" style={{ textShadow: `0 0 30px ${bossData.color}` }}>{bossData.emoji}</div>
-                      <h3 className="font-pixel text-2xl mb-2 text-center uppercase" style={{ color: bossData.color, textShadow: `0 0 10px ${bossData.color}` }}>{bossData.name}</h3>
-                      <p className="font-sans text-base text-white/70 mb-10 max-w-sm text-center italic">"{bossData.desc}"</p>
-                      <div className="font-vt text-9xl text-white drop-shadow-[0_0_20px_#FF5DA2] mb-10">25:00</div>
-                      <div className="flex gap-6">
-                        <button onClick={() => navigate('/arena')} className="bg-[#FFD60A] text-black font-pixel text-xs py-4 px-8 comic-shadow-pink hover:-translate-y-1 transition-transform border-2 border-white">
-                          START BATTLE
-                        </button>
-                        <button onClick={() => { setBossData(null); setFocusTask(''); }} className="bg-transparent border-2 border-[#00B4FF] text-[#00B4FF] font-pixel text-xs py-4 px-8 hover:bg-[#00B4FF]/20 transition-all">
-                          FLEE
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              { }
-              {activeTab === 'journal' && (
-                <div className="animate-pop flex flex-col h-full bg-black/40 p-8 rounded-2xl maze-wall border-[#A3FF12]/50 shadow-[0_0_20px_rgba(163,255,18,0.1)]">
-                  <div className="mb-8 border-b-2 border-[#A3FF12]/30 pb-4">
-                    <h3 className="font-pixel text-xl text-[#A3FF12] mb-2 drop-shadow-[0_0_5px_#A3FF12] flex items-center gap-3">
-                      <BookOpen className="w-6 h-6" /> ENERGY ALCHEMIST
-                    </h3>
-                    <p className="font-sans text-sm text-white/60">Log your thoughts. The AI will analyze your aura and translate your mood into RPG stat effects.</p>
-                  </div>
-
-                  <div className="flex flex-col gap-4 mb-8">
-                    <textarea
-                      value={journalInput}
-                      onChange={(e) => setJournalInput(e.target.value)}
-                      placeholder="How goes your journey today? e.g., 'Feeling pretty burnt out after debugging all night, but glad it works.'"
-                      className="w-full bg-black border-2 border-[#00B4FF] p-5 rounded-xl font-sans text-white focus:outline-none focus:border-[#A3FF12] focus:shadow-[0_0_15px_#A3FF12] transition-all resize-none h-40"
-                    />
-                    <button
-                      onClick={analyzeMood}
-                      disabled={isJournalLoading || !journalInput.trim()}
-                      className="bg-[#A3FF12] text-black font-pixel text-xs py-4 px-8 rounded-xl comic-shadow-cyan hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center self-start border-2 border-white"
-                    >
-                      {isJournalLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : "ALCHEMIZE ✨"}
-                    </button>
-                  </div>
-
-                  {journalError && <div className="bg-red-500/20 text-[#FF5DA2] border-2 border-[#FF5DA2] p-4 rounded-xl font-sans mb-4 shadow-[0_0_10px_#FF5DA2]">{journalError}</div>}
-
-                  {journalResult && (
-                    <div className="bg-black/80 border-4 p-8 rounded-xl animate-pop relative overflow-hidden" style={{ borderColor: journalResult.auraColor, boxShadow: `0 0 30px ${journalResult.auraColor}40` }}>
-                      <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-[60px] opacity-30" style={{ backgroundColor: journalResult.auraColor }}></div>
-                      <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-5 h-5 rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: journalResult.auraColor, color: journalResult.auraColor }}></div>
-                          <span className="font-vt text-3xl tracking-widest drop-shadow-[0_0_5px_currentColor]" style={{ color: journalResult.auraColor }}>AURA DETECTED</span>
-                        </div>
-                        <p className="font-sans text-xl italic text-white/90 mb-8 border-l-4 pl-5 bg-white/5 p-5 rounded-r-lg leading-relaxed" style={{ borderColor: journalResult.auraColor }}>
-                          "{journalResult.reading}"
-                        </p>
-                        <div className="grid grid-cols-3 gap-6">
-                          {journalResult.stats.map((stat, i) => {
-                            const isPositive = stat.value.startsWith('+');
-                            return (
-                              <div key={i} className="bg-black border-2 rounded-xl p-4 text-center" style={{ borderColor: `${journalResult.auraColor}50` }}>
-                                <div className="font-pixel text-[8px] text-white/50 mb-3 tracking-widest">{stat.name}</div>
-                                <div className={`font-vt text-4xl drop-shadow-[0_0_5px_currentColor] ${isPositive ? 'text-[#A3FF12]' : 'text-[#FF5DA2]'}`}>{stat.value}</div>
+                          <div className="space-y-4">
+                            {group.map((quest) => {
+                              const isSelected = editMode && selectedQuestId === quest.id;
+                              return (
+                              <div key={quest.id} onClick={(e) => editMode ? setSelectedQuestId(quest.id) : handleCompleteQuest(e, quest)} className={`quest-card relative bg-black/60 border-2 rounded-xl p-5 flex items-center justify-between cursor-pointer group ${quest.completed ? 'completed' : ''}`} style={{ borderColor: isSelected ? quest.color : (quest.completed ? '#333' : `${quest.color}50`), boxShadow: isSelected ? `0 0 16px ${quest.color}80` : 'none' }}>
+                                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+                                <div className="flex items-center gap-6 relative z-10 w-full">
+                                  <div className="w-8 h-8 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{ borderColor: quest.completed ? '#666' : quest.color, backgroundColor: quest.completed ? '#222' : 'transparent', color: quest.completed ? '#A3FF12' : 'transparent' }}>
+                                    <CheckSquare className="w-5 h-5" />
+                                  </div>
+                                  <div className="flex-1 relative">
+                                    <div className={`font-sans font-bold text-lg transition-colors ${quest.completed ? 'text-white/40' : 'text-white group-hover:text-white/90'}`}>
+                                      {quest.title} {quest.completed && <div className="strike-line"></div>}
+                                    </div>
+                                    <div className="font-pixel text-[8px] mt-2 tracking-wider" style={{ color: quest.completed ? '#666' : quest.color }}>{quest.tag}</div>
+                                  </div>
+                                  {editMode ? (
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setSelectedQuestId(quest.id); }}
+                                        className="flex items-center gap-1.5 bg-black border-2 text-white font-pixel text-[9px] px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                                        style={{ borderColor: quest.color }}
+                                      >
+                                        <Calendar className="w-3.5 h-3.5" style={{ color: quest.color }} />
+                                        {quest.date ? `${MONTH_LABELS[parseISO(quest.date).getMonth()]} ${parseISO(quest.date).getDate()}` : 'SET'}
+                                      </button>
+                                      <select
+                                        value={quest.frequency}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => changeFrequency(quest.id, e.target.value)}
+                                        className="bg-black border-2 text-white font-pixel text-[9px] px-3 py-2 rounded-lg focus:outline-none cursor-pointer"
+                                        style={{ borderColor: quest.color }}
+                                      >
+                                        {FREQUENCIES.map(f => (
+                                          <option key={f.key} value={f.key}>{f.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ) : (
+                                    <div className="font-vt text-3xl shrink-0" style={{ color: quest.completed ? '#666' : quest.color }}>+{quest.xp} XP</div>
+                                  )}
+                                </div>
                               </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {editMode && selectedQuest && (
+                    <div
+                      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-pop"
+                      onClick={() => setSelectedQuestId(null)}
+                    >
+                      <div
+                        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#0D0D0D] border-2 rounded-2xl p-6"
+                        style={{ borderColor: selectedQuest.color, boxShadow: `0 0 30px ${selectedQuest.color}40` }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => setSelectedQuestId(null)}
+                          className="absolute top-4 right-4 p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
+                          aria-label="Close calendar"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+
+                        <div className="mb-4 pr-10">
+                          <div className="font-pixel text-[10px] truncate" style={{ color: selectedQuest.color, textShadow: `0 0 5px ${selectedQuest.color}` }}>{selectedQuest.title}</div>
+                          <div className="font-vt text-base text-white/60 mt-1">{recurrenceHint(selectedQuest)}</div>
+                        </div>
+
+                        <div className="flex items-center justify-between mb-4">
+                          <button
+                            onClick={() => setCalendarMonth(m => { const d = new Date(m.year, m.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
+                            className="p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="font-pixel text-[10px] text-white text-center">{MONTH_LABELS[calendarMonth.month]} {calendarMonth.year}</span>
+                          <button
+                            onClick={() => setCalendarMonth(m => { const d = new Date(m.year, m.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
+                            className="p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-1 mb-1">
+                          {WEEKDAY_LABELS.map((w, i) => (
+                            <div key={i} className="text-center font-pixel text-[8px] text-white/40 py-1">{w[0]}</div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-1">
+                          {buildMonthMatrix(calendarMonth.year, calendarMonth.month).map(({ date, inMonth }, i) => {
+                            const highlighted = isHighlighted(selectedQuest, date);
+                            const isAnchor = sameDay(date, parseISO(selectedQuest.date));
+                            const isToday = sameDay(date, new Date());
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => changeDate(selectedQuest.id, toISO(date))}
+                                className={`relative aspect-square rounded-lg font-vt text-lg flex items-center justify-center transition-all hover:brightness-125 ${inMonth ? '' : 'opacity-30'}`}
+                                style={{
+                                  backgroundColor: isAnchor ? selectedQuest.color : (highlighted ? `${selectedQuest.color}25` : 'transparent'),
+                                  color: isAnchor ? '#000' : (highlighted ? '#fff' : '#888'),
+                                  border: highlighted && !isAnchor ? `1px solid ${selectedQuest.color}80` : '1px solid transparent',
+                                  boxShadow: isAnchor ? `0 0 12px ${selectedQuest.color}` : 'none',
+                                }}
+                              >
+                                {date.getDate()}
+                                {isToday && !isAnchor && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white"></span>}
+                              </button>
                             );
                           })}
                         </div>
+
+                        <div className="mt-4 flex items-center gap-4 font-vt text-sm text-white/50">
+                          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: selectedQuest.color }}></span>Anchor date</span>
+                          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: `${selectedQuest.color}25`, border: `1px solid ${selectedQuest.color}80` }}></span>Recurs</span>
+                          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>Today</span>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              { }
-              {activeTab === 'oracle' && (
-                <div className="animate-pop flex flex-col h-full bg-black/40 p-8 rounded-2xl maze-wall border-[#6A4CFF]/50 shadow-[0_0_20px_rgba(106,76,255,0.1)]">
-                  <div className="mb-8 border-b-2 border-[#6A4CFF]/30 pb-4">
-                    <h3 className="font-pixel text-xl text-[#6A4CFF] mb-2 drop-shadow-[0_0_5px_#6A4CFF] flex items-center gap-3">
-                      <Sparkles className="w-6 h-6" /> THE ORACLE
-                    </h3>
-                    <p className="font-sans text-sm text-white/60">Give the AI Oracle a massive life goal, and it will forge a clear path of epic quests for you.</p>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-4 mb-8">
-                    <input
-                      type="text"
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      placeholder="e.g. Build my first startup, Learn Japanese..."
-                      className="flex-1 bg-black border-2 border-[#00B4FF] p-4 rounded-xl font-sans text-white focus:outline-none focus:border-[#6A4CFF] focus:shadow-[0_0_15px_#6A4CFF] transition-all"
-                      onKeyDown={(e) => e.key === 'Enter' && generateQuests()}
-                    />
-                    <button
-                      onClick={generateQuests}
-                      disabled={isAiLoading || !aiInput.trim()}
-                      className="bg-[#6A4CFF] text-white font-pixel text-xs px-8 py-4 md:py-0 rounded-xl comic-shadow-yellow hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center min-w-[140px] border-2 border-white"
-                    >
-                      {isAiLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : "ASK ✨"}
-                    </button>
-                  </div>
-
-                  {aiError && <div className="bg-red-500/20 text-[#FF5DA2] border-2 border-[#FF5DA2] p-4 rounded-xl font-sans mb-4 shadow-[0_0_10px_#FF5DA2]">{aiError}</div>}
-
-                  <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-                    {aiQuests.length === 0 && !isAiLoading && !aiError && (
-                      <div className="text-center text-[#6A4CFF] font-vt text-3xl mt-16 animate-pulse drop-shadow-[0_0_5px_#6A4CFF]">
-                        Awaiting coordinates...
-                      </div>
-                    )}
-                    {aiQuests.map((q, i) => (
-                      <div key={i} className="bg-black/80 border-2 border-[#00B4FF]/30 p-5 rounded-xl flex items-center justify-between hover:border-white/30 transition-all cursor-pointer group hover:translate-x-2 duration-300">
-                        <div className="flex items-center gap-6">
-                          <div className="w-10 h-10 rounded-md border-2 border-[#00B4FF] group-hover:border-[#FFD60A] group-hover:shadow-[0_0_10px_#FFD60A] transition-all flex items-center justify-center">
-                            <Sparkles className="w-5 h-5 text-[#00B4FF] group-hover:text-[#FFD60A]" />
-                          </div>
-                          <div>
-                            <div className="font-sans font-bold text-lg text-white group-hover:text-[#FFD60A] transition-colors">{q.t}</div>
-                            <div className="font-pixel text-[8px] mt-2 tracking-widest drop-shadow-[0_0_2px_currentColor]" style={{ color: q.color }}>{q.tag}</div>
-                          </div>
-                        </div>
-                        <div className="font-vt text-3xl drop-shadow-[0_0_5px_currentColor]" style={{ color: q.color }}>+{q.xp} XP</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
             </div>
 
@@ -775,18 +636,6 @@ export default function DashboardApp() {
                 </div>
               </div>
 
-              <div className="maze-wall bg-[#FF5DA2]/5 p-6 rounded-2xl relative group overflow-hidden border-[#FF5DA2]/50">
-                <div className="absolute inset-0 bg-gradient-to-t from-[#FF5DA2]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <h3 className="font-pixel text-xs text-[#FF5DA2] mb-4 tracking-widest drop-shadow-[0_0_5px_#FF5DA2]">BOSS ENCOUNTER</h3>
-                <div className="text-center my-6 relative z-10">
-                  <div className="font-vt text-7xl text-white drop-shadow-[0_0_15px_#FF5DA2] group-hover:scale-105 transition-transform">25:00</div>
-                  <p className="font-sans text-sm text-[#FF5DA2] font-medium mt-2">DEEP WORK ARENA</p>
-                </div>
-                <button onClick={() => navigate('/arena')} className="w-full bg-[#FF5DA2] text-black font-pixel text-xs py-4 px-6 rounded comic-shadow-yellow hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all border-2 border-white flex items-center justify-center gap-3 relative z-10">
-                  <Swords className="w-5 h-5" /> ENTER ARENA
-                </button>
-              </div>
-
               <div className="bg-black/80 border-2 border-[#333] rounded-2xl p-6">
                 <h3 className="font-pixel text-xs text-white/70 mb-6 tracking-widest">SYSTEM LOGS</h3>
                 <div className="space-y-4">
@@ -819,15 +668,6 @@ export default function DashboardApp() {
         </button>
         <button onClick={() => setActiveTab('quests')} className={`${activeTab === 'quests' ? 'text-[#5CE1E6] scale-110' : 'text-white/50 hover:text-[#5CE1E6]'} flex flex-col items-center gap-1 transition-all`}>
           <CheckSquare className="w-6 h-6" />
-        </button>
-        <button onClick={() => setActiveTab('arena')} className={`relative -top-6 ${activeTab === 'arena' ? 'bg-[#FF5DA2] shadow-[0_0_20px_#FF5DA2]' : 'bg-[#111] border-[#FF5DA2]'} p-4 rounded-full border-2 border-white text-white`}>
-          <Timer className="w-6 h-6" />
-        </button>
-        <button onClick={() => setActiveTab('journal')} className={`${activeTab === 'journal' ? 'text-[#A3FF12] scale-110' : 'text-white/50 hover:text-[#A3FF12]'} flex flex-col items-center gap-1 transition-all`}>
-          <BookOpen className="w-6 h-6" />
-        </button>
-        <button onClick={() => setActiveTab('oracle')} className={`${activeTab === 'oracle' ? 'text-[#6A4CFF] scale-110' : 'text-white/50 hover:text-[#6A4CFF]'} flex flex-col items-center gap-1 transition-all`}>
-          <Sparkles className="w-6 h-6" />
         </button>
       </nav>
 

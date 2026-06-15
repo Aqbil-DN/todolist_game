@@ -4,6 +4,7 @@ import {
   ArrowLeft, Sparkles, Database, TerminalSquare,
   Cpu, Zap, Fingerprint, Star, RefreshCcw, Coins
 } from 'lucide-react';
+import { useCoins } from '../useCoins';
 
 import img1 from '../assets/card_pull/01.png';
 import img2 from '../assets/card_pull/02.png';
@@ -27,9 +28,14 @@ const heroImages = [
 
 export default function GachaApp() {
   const navigate = useNavigate();
+  const { coins, spendCoins } = useCoins();
   const [gachaState, setGachaState] = useState('idle'); // 'idle' | 'hacking' | 'revealing' | 'result'
   const [pulledHeroes, setPulledHeroes] = useState([]);
   const [decryptLogs, setDecryptLogs] = useState([]);
+  const [insufficient, setInsufficient] = useState(false);
+
+  // Cost per single pull (10x = COST_PER_PULL * 10)
+  const COST_PER_PULL = 100;
 
   // Data 15 Neural Net Idols untuk Gacha Pool
   const gachaPool = [
@@ -52,6 +58,14 @@ export default function GachaApp() {
 
   // Gacha Logic & Rates
   const performPull = (times) => {
+    // Charge coins up-front; block the pull if the wallet is too low.
+    const cost = times * COST_PER_PULL;
+    if (!spendCoins(cost)) {
+      setInsufficient(true);
+      setTimeout(() => setInsufficient(false), 2200);
+      return;
+    }
+
     setGachaState('hacking');
     setDecryptLogs([]);
     setPulledHeroes([]);
@@ -216,7 +230,7 @@ export default function GachaApp() {
           <div className="hidden md:flex items-center gap-6 bg-black border-2 border-white/20 p-3 rounded-lg">
             <div className="flex items-center gap-2">
               <Coins className="w-5 h-5 text-[#FFD60A]" />
-              <span className="font-vt text-2xl text-[#FFD60A]">12,450 XP</span>
+              <span className="font-vt text-2xl text-[#FFD60A]">{coins.toLocaleString()} COINS</span>
             </div>
             <div className="h-6 w-px bg-white/20"></div>
             <div className="font-pixel text-[8px] text-white/50 text-right">
@@ -265,21 +279,30 @@ export default function GachaApp() {
             <div className="flex flex-col sm:flex-row gap-6 w-full justify-center">
               <button
                 onClick={() => performPull(1)}
-                className="bg-transparent text-[#00B4FF] font-pixel text-sm md:text-base py-5 px-8 rounded-xl border-4 border-[#00B4FF] hover:bg-[#00B4FF]/10 hover:shadow-[0_0_20px_#00B4FF] transition-all flex items-center justify-center gap-3 w-full md:w-auto"
+                disabled={coins < COST_PER_PULL}
+                className="bg-transparent text-[#00B4FF] font-pixel text-sm md:text-base py-5 px-8 rounded-xl border-4 border-[#00B4FF] hover:bg-[#00B4FF]/10 hover:shadow-[0_0_20px_#00B4FF] transition-all flex items-center justify-center gap-3 w-full md:w-auto disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none"
               >
                 <Fingerprint className="w-6 h-6" /> DECRYPT 1x
-                <span className="text-[#FFD60A] ml-2 text-xs">(-100 XP)</span>
+                <span className="text-[#FFD60A] ml-2 text-xs">(-{COST_PER_PULL} COINS)</span>
               </button>
 
               <button
                 onClick={() => performPull(10)}
-                className="bg-gradient-to-r from-[#FF5DA2] to-[#9D4EDD] text-white font-pixel text-sm md:text-base py-5 px-8 rounded-xl border-4 border-white comic-shadow-yellow btn-comic flex items-center justify-center gap-3 w-full md:w-auto shadow-[0_0_20px_rgba(255,93,162,0.5)]"
+                disabled={coins < COST_PER_PULL * 10}
+                className="bg-gradient-to-r from-[#FF5DA2] to-[#9D4EDD] text-white font-pixel text-sm md:text-base py-5 px-8 rounded-xl border-4 border-white comic-shadow-yellow btn-comic flex items-center justify-center gap-3 w-full md:w-auto shadow-[0_0_20px_rgba(255,93,162,0.5)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ color: '#000', backgroundColor: '#FFD60A' }} // Override for comic style
               >
                 <Cpu className="w-6 h-6" /> DECRYPT 10x
-                <span className="text-white ml-2 text-xs bg-black px-2 py-1 rounded">(-1000 XP)</span>
+                <span className="text-white ml-2 text-xs bg-black px-2 py-1 rounded">(-{COST_PER_PULL * 10} COINS)</span>
               </button>
             </div>
+
+            {/* Insufficient funds warning */}
+            {insufficient && (
+              <div className="font-pixel text-[10px] text-[#FF003C] text-center animate-pop tracking-widest drop-shadow-[0_0_8px_#FF003C]">
+                ⚠ NOT ENOUGH COINS — COMPLETE QUESTS TO EARN MORE
+              </div>
+            )}
           </div>
         )}
 
@@ -399,19 +422,28 @@ export default function GachaApp() {
             </div>
 
             {/* Action Buttons After Result */}
-            <div className="mt-16 flex gap-6 animate-pop" style={{ animationDelay: '1s' }}>
-              <button
-                onClick={() => setGachaState('idle')}
-                className="bg-transparent text-white font-pixel text-[10px] md:text-xs py-4 px-8 border-2 border-white hover:bg-white hover:text-black transition-colors flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" /> DONE
-              </button>
-              <button
-                onClick={() => performPull(pulledHeroes.length)} // Pull again with same amount
-                className="bg-[#00B4FF] text-black font-pixel text-[10px] md:text-xs py-4 px-8 border-2 border-white comic-shadow-pink btn-comic flex items-center gap-2"
-              >
-                <RefreshCcw className="w-4 h-4" /> PULL AGAIN
-              </button>
+            <div className="mt-16 flex flex-col items-center gap-3 animate-pop" style={{ animationDelay: '1s' }}>
+              <div className="flex gap-6">
+                <button
+                  onClick={() => setGachaState('idle')}
+                  className="bg-transparent text-white font-pixel text-[10px] md:text-xs py-4 px-8 border-2 border-white hover:bg-white hover:text-black transition-colors flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" /> DONE
+                </button>
+                <button
+                  onClick={() => performPull(pulledHeroes.length)} // Pull again with same amount
+                  disabled={coins < pulledHeroes.length * COST_PER_PULL}
+                  className="bg-[#00B4FF] text-black font-pixel text-[10px] md:text-xs py-4 px-8 border-2 border-white comic-shadow-pink btn-comic flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <RefreshCcw className="w-4 h-4" /> PULL AGAIN
+                  <span className="text-black/70">(-{pulledHeroes.length * COST_PER_PULL})</span>
+                </button>
+              </div>
+              {insufficient && (
+                <div className="font-pixel text-[10px] text-[#FF003C] text-center tracking-widest drop-shadow-[0_0_8px_#FF003C]">
+                  ⚠ NOT ENOUGH COINS — COMPLETE QUESTS TO EARN MORE
+                </div>
+              )}
             </div>
 
           </div>

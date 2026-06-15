@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, GitBranch, Mail, Key, TerminalSquare, 
-  Gamepad2, Zap, CircleDashed, Loader2, LogIn, ChevronRight
-} from 'lucide-react';
+import { ArrowLeft, Gamepad2, Zap, Loader2 } from 'lucide-react';
 
 export default function InsertCoinApp() {
   const navigate = useNavigate();
   const [gameState, setGameState] = useState('waiting'); // 'waiting' | 'inserting' | 'login' | 'authenticating'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
 
   const handleInsertCoin = () => {
     setGameState('inserting');
@@ -20,16 +14,9 @@ export default function InsertCoinApp() {
     }, 1500);
   };
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setErrorMessage('SYSTEM ERROR: INCOMPLETE CREDENTIALS');
-      return;
-    }
-    setErrorMessage('');
+  const handleGoogleLogin = () => {
     setGameState('authenticating');
-    
-    // Simulate API Call
+    // Simulate Google OAuth flow
     setTimeout(() => {
       navigate('/');
     }, 2000);
@@ -207,19 +194,6 @@ export default function InsertCoinApp() {
           <p className="font-vt text-2xl text-[#00B4FF] mb-8">
             The maze awaits. Authenticate to sync your progress and resume your quests.
           </p>
-
-          <div className="maze-wall p-6 rounded-xl bg-black/60 relative overflow-hidden">
-            <div className="absolute right-0 top-0 w-24 h-24 bg-[#FF5DA2]/10 blur-2xl"></div>
-            <div className="flex items-center gap-4 mb-4">
-              <TerminalSquare className="w-8 h-8 text-[#FF5DA2]" />
-              <h3 className="font-pixel text-xs text-[#FF5DA2]">SYSTEM STATUS</h3>
-            </div>
-            <ul className="font-vt text-xl text-white/70 space-y-2">
-              <li className="flex justify-between"><span>CORE SERVERS:</span> <span className="text-[#A3FF12]">ONLINE</span></li>
-              <li className="flex justify-between"><span>XP MULTIPLIER:</span> <span className="text-[#FFD60A]">1.5x ACTIVE</span></li>
-              <li className="flex justify-between"><span>GHOST PROXIMITY:</span> <span className="text-[#FF5DA2]">UNDETECTED</span></li>
-            </ul>
-          </div>
         </div>
 
         <div className="maze-wall p-8 rounded-2xl bg-black/80 shadow-[0_0_30px_rgba(0,180,255,0.2)]">
@@ -231,79 +205,22 @@ export default function InsertCoinApp() {
             <Zap className="w-6 h-6 text-[#FFD60A]" />
           </div>
 
-          {/* Social Logins */}
-          <div className="flex gap-4 mb-8">
-            <button className="flex-1 bg-white text-black font-pixel text-[10px] py-4 px-4 comic-shadow-blue btn-comic flex items-center justify-center gap-2 hover-glitch border-2 border-black">
-              <GitBranch className="w-5 h-5" /> GITHUB
-            </button>
-            <button className="flex-1 bg-white text-black font-pixel text-[10px] py-4 px-4 comic-shadow-pink btn-comic flex items-center justify-center gap-2 hover-glitch border-2 border-black">
-              <span className="font-sans font-bold text-lg">G</span> GOOGLE
-            </button>
-          </div>
-
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-[2px] flex-1 bg-[#00B4FF]/30"></div>
-            <span className="font-vt text-xl text-[#00B4FF]">OR MANUAL OVERRIDE</span>
-            <div className="h-[2px] flex-1 bg-[#00B4FF]/30"></div>
-          </div>
-
-          {/* Error Message Display */}
-          {errorMessage && (
-            <div className="bg-red-500/20 border-2 border-[#FF5DA2] p-3 mb-6 rounded text-center">
-              <span className="font-pixel text-[8px] text-[#FF5DA2] animate-pulse">{errorMessage}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block font-pixel text-[10px] text-[#5CE1E6] mb-2">EMAIL ADDRESS</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00B4FF]" />
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="player1@secondbrain.com"
-                  className="w-full arcade-input py-4 pl-12 pr-4 font-vt text-xl rounded-lg"
-                  disabled={gameState === 'authenticating'}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-pixel text-[10px] text-[#5CE1E6] mb-2 flex justify-between">
-                <span>PASSWORD</span>
-                <a href="#" className="text-[#FF5DA2] hover:underline">FORGOT?</a>
-              </label>
-              <div className="relative">
-                <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00B4FF]" />
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full arcade-input py-4 pl-12 pr-4 font-vt text-xl tracking-widest rounded-lg"
-                  disabled={gameState === 'authenticating'}
-                />
-              </div>
-            </div>
-
-            <button 
-              type="submit"
-              disabled={gameState === 'authenticating'}
-              className="w-full bg-[#FFD60A] text-black font-pixel text-xs md:text-sm py-5 px-6 comic-shadow-pink btn-comic flex items-center justify-center gap-3 border-2 border-white mt-4 disabled:opacity-70 disabled:transform-none disabled:shadow-none"
-            >
-              {gameState === 'authenticating' ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" /> ESTABLISHING LINK...
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5" /> INITIALIZE
-                </>
-              )}
-            </button>
-          </form>
+          {/* Google Login */}
+          <button 
+            onClick={handleGoogleLogin}
+            disabled={gameState === 'authenticating'}
+            className="w-full bg-white text-black font-pixel text-xs md:text-sm py-5 px-6 comic-shadow-pink btn-comic flex items-center justify-center gap-3 hover-glitch border-2 border-black disabled:opacity-70 disabled:transform-none disabled:shadow-none"
+          >
+            {gameState === 'authenticating' ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" /> ESTABLISHING LINK...
+              </>
+            ) : (
+              <>
+                <span className="font-sans font-bold text-xl">G</span> SIGN IN WITH GOOGLE
+              </>
+            )}
+          </button>
 
           <p className="text-center font-sans text-sm text-white/50 mt-8">
             New to the Arcade? <button onClick={(e) => { e.preventDefault(); navigate('/register'); }} className="text-[#5CE1E6] hover:text-[#FFD60A] hover:underline transition-colors font-bold">Create Character</button>
