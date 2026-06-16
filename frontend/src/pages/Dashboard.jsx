@@ -87,6 +87,67 @@ const timeAgo = (iso) => {
   return `${Math.floor(hours / 24)}d ago`;
 };
 
+// Shared month-grid calendar used by both the add-quest form and the edit modal.
+// `date` is the ISO anchor day; the recurrence preview is derived from `frequency`.
+function QuestCalendar({ color, frequency, date, month, setMonth, onPick }) {
+  const ref = { date, frequency };
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => setMonth(m => { const d = new Date(m.year, m.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
+          className="p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="font-pixel text-[10px] text-white text-center">{MONTH_LABELS[month.month]} {month.year}</span>
+        <button
+          onClick={() => setMonth(m => { const d = new Date(m.year, m.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
+          className="p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {WEEKDAY_LABELS.map((w, i) => (
+          <div key={i} className="text-center font-pixel text-[8px] text-white/40 py-1">{w[0]}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {buildMonthMatrix(month.year, month.month).map(({ date: day, inMonth }, i) => {
+          const highlighted = isHighlighted(ref, day);
+          const isAnchor = sameDay(day, parseISO(date));
+          const isToday = sameDay(day, new Date());
+          return (
+            <button
+              key={i}
+              onClick={() => onPick(toISO(day))}
+              className={`relative aspect-square rounded-lg font-vt text-lg flex items-center justify-center transition-all hover:brightness-125 ${inMonth ? '' : 'opacity-30'}`}
+              style={{
+                backgroundColor: isAnchor ? color : (highlighted ? `${color}25` : 'transparent'),
+                color: isAnchor ? '#000' : (highlighted ? '#fff' : '#888'),
+                border: highlighted && !isAnchor ? `1px solid ${color}80` : '1px solid transparent',
+                boxShadow: isAnchor ? `0 0 12px ${color}` : 'none',
+              }}
+            >
+              {day.getDate()}
+              {isToday && !isAnchor && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white"></span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex items-center gap-4 font-vt text-sm text-white/50">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: color }}></span>Anchor date</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: `${color}25`, border: `1px solid ${color}80` }}></span>Recurs</span>
+        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>Today</span>
+      </div>
+    </>
+  );
+}
+
 export default function DashboardApp() {
   const navigate = useNavigate();
   const { coins, setCoins } = useCoins();
@@ -151,6 +212,10 @@ export default function DashboardApp() {
   // Quest creation + edit State
   const [newTaskInput, setNewTaskInput] = useState('');
   const [newTaskCategory, setNewTaskCategory] = useState('HEALTH');
+  const [newTaskFrequency, setNewTaskFrequency] = useState('daily');
+  const [newTaskDate, setNewTaskDate] = useState(toISO(new Date()));
+  const [showAddCalendar, setShowAddCalendar] = useState(false);
+  const [addCalendarMonth, setAddCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
   const [editMode, setEditMode] = useState(false);
   const [selectedQuestId, setSelectedQuestId] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
@@ -194,11 +259,12 @@ export default function DashboardApp() {
         xp: 15,
         tag: category.tag,
         color: category.color,
-        frequency: 'daily',
-        date: toISO(new Date()),
+        frequency: newTaskFrequency,
+        date: newTaskDate,
       });
       setQuests(prev => [created, ...prev]);
       setNewTaskInput('');
+      setShowAddCalendar(false);
     } catch {
       // ignore creation failure
     }
@@ -305,6 +371,7 @@ export default function DashboardApp() {
   );
 
   const selectedQuest = quests.find(q => q.id === selectedQuestId) || null;
+  const addColor = (CATEGORIES.find(c => c.tag === newTaskCategory) || CATEGORIES[0]).color;
 
   return (
     <div className="h-screen w-full bg-[#0D0D0D] crt pixel-grid flex overflow-hidden selection:bg-[#FFD60A] selection:text-black">
@@ -485,33 +552,90 @@ export default function DashboardApp() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col md:flex-row gap-3 mb-8 bg-[#111] p-4 rounded-xl border-2 border-[#333]">
+                  <div className="mb-8 bg-[#111] p-4 rounded-xl border-2 border-[#333]">
+                    {/* Row 1 — the task itself */}
                     <input
                       type="text"
                       value={newTaskInput}
                       onChange={(e) => setNewTaskInput(e.target.value)}
                       placeholder="Add a boring real-life task..."
-                      className="flex-1 bg-black border-2 border-[#00B4FF] p-3 rounded-lg font-sans text-sm text-white focus:outline-none focus:border-[#A3FF12] focus:shadow-[0_0_10px_#A3FF12] transition-all"
+                      className="w-full bg-black border-2 border-[#00B4FF] p-3 rounded-lg font-sans text-sm text-white focus:outline-none focus:border-[#A3FF12] focus:shadow-[0_0_10px_#A3FF12] transition-all"
                       onKeyDown={(e) => e.key === 'Enter' && addNormalTask()}
                     />
-                    <div className="flex gap-2">
-                      <select
-                        value={newTaskCategory}
-                        onChange={(e) => setNewTaskCategory(e.target.value)}
-                        className="bg-black border-2 border-[#00B4FF] text-white font-pixel text-[10px] px-4 py-3 md:py-0 rounded-lg focus:outline-none focus:border-[#A3FF12] cursor-pointer"
-                      >
-                        {CATEGORIES.map(c => (
-                          <option key={c.tag} value={c.tag}>{c.tag}</option>
-                        ))}
-                      </select>
+
+                    {/* Row 2 — labelled metadata selectors + ADD */}
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-3">
+                      <div className="flex flex-1 gap-2">
+                        {/* Category */}
+                        <label className="flex-1 flex flex-col gap-1">
+                          <span className="font-pixel text-[7px] text-white/40 tracking-widest">CATEGORY</span>
+                          <select
+                            value={newTaskCategory}
+                            onChange={(e) => setNewTaskCategory(e.target.value)}
+                            className="w-full bg-black border-2 border-[#00B4FF] text-white font-pixel text-[10px] px-3 py-3 rounded-lg focus:outline-none focus:border-[#A3FF12] cursor-pointer"
+                          >
+                            {CATEGORIES.map(c => (
+                              <option key={c.tag} value={c.tag}>{c.tag}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        {/* Frequency */}
+                        <label className="flex-1 flex flex-col gap-1">
+                          <span className="font-pixel text-[7px] text-white/40 tracking-widest">FREQUENCY</span>
+                          <select
+                            value={newTaskFrequency}
+                            onChange={(e) => setNewTaskFrequency(e.target.value)}
+                            className="w-full bg-black border-2 border-[#00B4FF] text-white font-pixel text-[10px] px-3 py-3 rounded-lg focus:outline-none focus:border-[#A3FF12] cursor-pointer"
+                          >
+                            {FREQUENCIES.map(f => (
+                              <option key={f.key} value={f.key}>{f.label}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        {/* Date / recurrence anchor */}
+                        <div className="flex-1 flex flex-col gap-1">
+                          <span className="font-pixel text-[7px] text-white/40 tracking-widest">DATE</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddCalendar(v => {
+                              const next = !v;
+                              if (next) { const d = parseISO(newTaskDate); setAddCalendarMonth({ year: d.getFullYear(), month: d.getMonth() }); }
+                              return next;
+                            })}
+                            className="w-full bg-black border-2 text-white font-pixel text-[10px] px-3 py-3 rounded-lg focus:outline-none cursor-pointer flex items-center justify-center gap-2 transition-colors"
+                            style={{ borderColor: showAddCalendar ? '#A3FF12' : '#00B4FF' }}
+                          >
+                            <Calendar className="w-3.5 h-3.5" style={{ color: addColor }} />
+                            {`${MONTH_LABELS[parseISO(newTaskDate).getMonth()]} ${parseISO(newTaskDate).getDate()}`}
+                          </button>
+                        </div>
+                      </div>
+
                       <button
                         onClick={addNormalTask}
                         disabled={!newTaskInput.trim()}
-                        className="bg-[#A3FF12] text-black font-pixel text-[10px] px-6 py-3 md:py-0 rounded-lg comic-shadow-pink hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center border-2 border-white"
+                        className="bg-[#A3FF12] text-black font-pixel text-[10px] px-6 py-3 rounded-lg comic-shadow-pink hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center border-2 border-white"
                       >
                         ADD
                       </button>
                     </div>
+
+                    {/* Inline calendar — toggled by the DATE button, tinted to the category */}
+                    {showAddCalendar && (
+                      <div className="mt-3 p-4 bg-black/60 rounded-lg border-2 animate-pop" style={{ borderColor: `${addColor}50` }}>
+                        <div className="font-vt text-base text-white/60 mb-3">{recurrenceHint({ date: newTaskDate, frequency: newTaskFrequency })}</div>
+                        <QuestCalendar
+                          color={addColor}
+                          frequency={newTaskFrequency}
+                          date={newTaskDate}
+                          month={addCalendarMonth}
+                          setMonth={setAddCalendarMonth}
+                          onPick={(iso) => setNewTaskDate(iso)}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-6 overflow-y-auto flex-1 pr-2">
@@ -599,57 +723,14 @@ export default function DashboardApp() {
                           <div className="font-vt text-base text-white/60 mt-1">{recurrenceHint(selectedQuest)}</div>
                         </div>
 
-                        <div className="flex items-center justify-between mb-4">
-                          <button
-                            onClick={() => setCalendarMonth(m => { const d = new Date(m.year, m.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
-                            className="p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-                          <span className="font-pixel text-[10px] text-white text-center">{MONTH_LABELS[calendarMonth.month]} {calendarMonth.year}</span>
-                          <button
-                            onClick={() => setCalendarMonth(m => { const d = new Date(m.year, m.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
-                            className="p-1.5 rounded-lg border-2 border-[#333] hover:border-white text-white transition-colors"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-1 mb-1">
-                          {WEEKDAY_LABELS.map((w, i) => (
-                            <div key={i} className="text-center font-pixel text-[8px] text-white/40 py-1">{w[0]}</div>
-                          ))}
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-1">
-                          {buildMonthMatrix(calendarMonth.year, calendarMonth.month).map(({ date, inMonth }, i) => {
-                            const highlighted = isHighlighted(selectedQuest, date);
-                            const isAnchor = sameDay(date, parseISO(selectedQuest.date));
-                            const isToday = sameDay(date, new Date());
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => changeDate(selectedQuest.id, toISO(date))}
-                                className={`relative aspect-square rounded-lg font-vt text-lg flex items-center justify-center transition-all hover:brightness-125 ${inMonth ? '' : 'opacity-30'}`}
-                                style={{
-                                  backgroundColor: isAnchor ? selectedQuest.color : (highlighted ? `${selectedQuest.color}25` : 'transparent'),
-                                  color: isAnchor ? '#000' : (highlighted ? '#fff' : '#888'),
-                                  border: highlighted && !isAnchor ? `1px solid ${selectedQuest.color}80` : '1px solid transparent',
-                                  boxShadow: isAnchor ? `0 0 12px ${selectedQuest.color}` : 'none',
-                                }}
-                              >
-                                {date.getDate()}
-                                {isToday && !isAnchor && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white"></span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        <div className="mt-4 flex items-center gap-4 font-vt text-sm text-white/50">
-                          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: selectedQuest.color }}></span>Anchor date</span>
-                          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: `${selectedQuest.color}25`, border: `1px solid ${selectedQuest.color}80` }}></span>Recurs</span>
-                          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>Today</span>
-                        </div>
+                        <QuestCalendar
+                          color={selectedQuest.color}
+                          frequency={selectedQuest.frequency}
+                          date={selectedQuest.date}
+                          month={calendarMonth}
+                          setMonth={setCalendarMonth}
+                          onPick={(iso) => changeDate(selectedQuest.id, iso)}
+                        />
                       </div>
                     </div>
                   )}
