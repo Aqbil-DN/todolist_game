@@ -230,7 +230,7 @@ export default function AchievementsApp() {
               onClick={() => setFilter('LOCKED')}
               className={`font-vt text-xl md:text-2xl px-6 py-2 rounded-lg border-2 transition-all shrink-0 flex items-center gap-2 ${filter === 'LOCKED' ? 'bg-[#333] text-white border-white/30 shadow-[4px_4px_0_0_#FFD60A]' : 'bg-transparent text-white/30 border-transparent hover:bg-white/5'}`}
             >
-              <Lock className="w-4 h-4" /> LOCKED ({50 - unlockedCount})
+              <Lock className="w-4 h-4" /> LOCKED ({regularTotal - unlockedCount})
             </button>
           </div>
 
