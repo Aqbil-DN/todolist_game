@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 
+from ..achievements_engine import evaluate_achievements
 from ..database import fetch_all, fetch_one, get_conn
 from ..firebase import get_current_user
 from ..schemas import QuestCreate, QuestUpdate
@@ -31,20 +34,6 @@ def serialize_quest(quest: dict) -> dict:
     }
 
 
-def _unlock_achievement(cursor, user_id: int, achievement_id: int) -> bool:
-    cursor.execute(
-        "SELECT 1 AS found FROM user_achievements WHERE user_id = %s AND achievement_id = %s",
-        (user_id, achievement_id),
-    )
-    if fetch_one(cursor):
-        return False
-    cursor.execute(
-        "INSERT INTO user_achievements (user_id, achievement_id) VALUES (%s, %s)",
-        (user_id, achievement_id),
-    )
-    return True
-
-
 @router.get("")
 def list_quests(user=Depends(get_current_user), conn=Depends(get_conn)):
     cursor = conn.cursor()
@@ -53,6 +42,67 @@ def list_quests(user=Depends(get_current_user), conn=Depends(get_conn)):
         (user["id"],),
     )
     return [serialize_quest(quest) for quest in fetch_all(cursor)]
+
+
+def _current_streak(days: set, today) -> int:
+    """Count consecutive days (ending today or yesterday) with a completion."""
+    if today in days:
+        anchor = today
+    elif (today - timedelta(days=1)) in days:
+        anchor = today - timedelta(days=1)
+    else:
+        return 0
+    streak = 0
+    while anchor in days:
+        streak += 1
+        anchor -= timedelta(days=1)
+    return streak
+
+
+@router.get("/streak")
+def quest_streak(user=Depends(get_current_user), conn=Depends(get_conn)):
+    """Current quest-completion streak: consecutive days with >=1 completion."""
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT DISTINCT DATE(completed_at) AS day
+        FROM quests
+        WHERE user_id = %s AND completed = 1 AND completed_at IS NOT NULL
+        """,
+        (user["id"],),
+    )
+    days = {row["day"] for row in fetch_all(cursor)}
+    cursor.execute("SELECT CURRENT_DATE AS today")
+    today = fetch_one(cursor)["today"]
+    return {"streak": _current_streak(days, today)}
+
+
+@router.get("/activity")
+def quest_activity(user=Depends(get_current_user), conn=Depends(get_conn)):
+    """Recent quest completions, newest first, for the dashboard activity log."""
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, title, xp, color, completed_at
+        FROM quests
+        WHERE user_id = %s AND completed = 1 AND completed_at IS NOT NULL
+        ORDER BY completed_at DESC
+        LIMIT 10
+        """,
+        (user["id"],),
+    )
+    return [
+        {
+            "id": row["id"],
+            "title": row["title"],
+            "xp": row["xp"],
+            "color": row["color"],
+            "completedAt": row["completed_at"].isoformat()
+            if row["completed_at"] is not None
+            else None,
+        }
+        for row in fetch_all(cursor)
+    ]
 
 
 @router.post("", status_code=201)
@@ -161,15 +211,7 @@ def complete_quest(
         (new_xp, new_level, new_coins, user["id"]),
     )
 
-    unlocked: list[int] = []
-    cursor.execute(
-        "SELECT COUNT(*) AS completed_count FROM quests WHERE user_id = %s AND completed = 1",
-        (user["id"],),
-    )
-    if fetch_one(cursor)["completed_count"] == 1 and _unlock_achievement(
-        cursor, user["id"], 1
-    ):
-        unlocked.append(1)
+    unlocked = evaluate_achievements(cursor, user["id"])
 
     conn.commit()
 

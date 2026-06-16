@@ -75,6 +75,18 @@ const recurrenceHint = (quest) => {
   }
 };
 
+// Compact relative timestamp ("2m ago", "3h ago", "5d ago") for the activity log.
+const timeAgo = (iso) => {
+  if (!iso) return '';
+  const secs = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+};
+
 export default function DashboardApp() {
   const navigate = useNavigate();
   const { coins, setCoins } = useCoins();
@@ -84,6 +96,14 @@ export default function DashboardApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [floatingXPs, setFloatingXPs] = useState([]);
   const xpBarRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  // Dashboard summary widgets (streak, activity log, collection counts, alerts).
+  const [streak, setStreak] = useState(0);
+  const [activityLog, setActivityLog] = useState([]);
+  const [achCount, setAchCount] = useState({ unlocked: 0, total: 0 });
+  const [heroCount, setHeroCount] = useState({ unlocked: 0, total: 0 });
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Main Quests State (loaded from the backend)
   const [quests, setQuests] = useState([]);
@@ -102,6 +122,31 @@ export default function DashboardApp() {
       setPlayerLevel(profile.level ?? 1);
     }
   }, [profile]);
+
+  // Aggregate dashboard widgets sourced from the backend.
+  const loadDashboardSummary = async () => {
+    const [streakRes, activity, myAch, allAch, myHeroes, allHeroes, notifs] = await Promise.all([
+      api.getQuestStreak().catch(() => ({ streak: 0 })),
+      api.getQuestActivity().catch(() => []),
+      api.getMyAchievements().catch(() => []),
+      api.getAchievements().catch(() => []),
+      api.getMyHeroes().catch(() => []),
+      api.getHeroes().catch(() => []),
+      api.getNotifications().catch(() => []),
+    ]);
+    if (!mountedRef.current) return;
+    setStreak(streakRes?.streak ?? 0);
+    setActivityLog(Array.isArray(activity) ? activity : []);
+    setAchCount({ unlocked: myAch.length, total: allAch.length });
+    setHeroCount({ unlocked: myHeroes.length, total: allHeroes.length });
+    setUnreadCount(notifs.filter(n => !n.read).length);
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadDashboardSummary();
+    return () => { mountedRef.current = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Quest creation + edit State
   const [newTaskInput, setNewTaskInput] = useState('');
@@ -134,6 +179,7 @@ export default function DashboardApp() {
       setPlayerXP(result.xp);
       setPlayerLevel(result.level);
       setCoins(result.coins);
+      loadDashboardSummary();
     } catch {
       // leave state unchanged on failure
     }
@@ -338,14 +384,16 @@ export default function DashboardApp() {
               <span className="font-vt text-xl text-[#FFD60A]">{coins.toLocaleString()}</span>
             </div>
 
-            <div className="flex items-center gap-2 bg-[#FF9F1C]/10 border border-[#FF9F1C] px-3 py-1 rounded-full cursor-pointer hover:bg-[#FF9F1C]/20 transition-colors">
+            <div className="flex items-center gap-2 bg-[#FF9F1C]/10 border border-[#FF9F1C] px-3 py-1 rounded-full cursor-pointer hover:bg-[#FF9F1C]/20 transition-colors" title="Quest completion streak">
               <Flame className="w-4 h-4 text-[#FF9F1C]" />
-              <span className="font-vt text-xl text-[#FF9F1C]">14 <span className="hidden md:inline">Days</span></span>
+              <span className="font-vt text-xl text-[#FF9F1C]">{streak} <span className="hidden md:inline">Days</span></span>
             </div>
 
             <button onClick={() => navigate('/notifications')} className="relative text-white/70 hover:text-white transition-colors">
               <Bell className="w-6 h-6" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#FF5DA2] border border-black rounded-full shadow-[0_0_8px_#FF5DA2]"></span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#FF5DA2] border border-black rounded-full shadow-[0_0_8px_#FF5DA2]"></span>
+              )}
             </button>
 
             <div onClick={() => navigate('/profile')} className="flex items-center gap-3 pl-6 border-l-2 border-[#00B4FF]/30 cursor-pointer group">
@@ -649,14 +697,14 @@ export default function DashboardApp() {
                     <Trophy className="w-6 h-6 text-[#A3FF12]" />
                     <div>
                       <div className="font-pixel text-[8px] text-white/50">ACHIEVEMENTS</div>
-                      <div className="font-vt text-2xl">12/50</div>
+                      <div className="font-vt text-2xl">{achCount.unlocked}/{achCount.total}</div>
                     </div>
                   </div>
                   <div onClick={() => navigate('/hero')} className="bg-[#111] p-3 rounded-lg border border-[#333] flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors">
                     <Shield className="w-6 h-6 text-[#FF5DA2]" />
                     <div>
                       <div className="font-pixel text-[8px] text-white/50">HERO</div>
-                      <div className="font-vt text-2xl text-[#FF5DA2]">6/15</div>
+                      <div className="font-vt text-2xl text-[#FF5DA2]">{heroCount.unlocked}/{heroCount.total}</div>
                     </div>
                   </div>
                 </div>
@@ -665,16 +713,15 @@ export default function DashboardApp() {
               <div className="bg-black/80 border-2 border-[#333] rounded-2xl p-6">
                 <h3 className="font-pixel text-xs text-white/70 mb-6 tracking-widest">SYSTEM LOGS</h3>
                 <div className="space-y-4">
-                  {[
-                    { log: "Completed 'Cardio'", time: "2m ago", color: "#A3FF12" },
-                    { log: "Gained 'Early Bird' Badge", time: "3h ago", color: "#FFD60A" },
-                    { log: "Logged Mood: Energetic", time: "5h ago", color: "#5CE1E6" }
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-4 items-start">
+                  {activityLog.length === 0 && (
+                    <p className="font-vt text-sm text-white/40">No quests completed yet.</p>
+                  )}
+                  {activityLog.map((item) => (
+                    <div key={item.id} className="flex gap-4 items-start">
                       <div className="w-2 h-2 mt-1.5 rounded-full shadow-[0_0_5px_currentColor]" style={{ backgroundColor: item.color, color: item.color }}></div>
                       <div>
-                        <p className="font-sans text-sm text-white/90">{item.log}</p>
-                        <p className="font-vt text-sm text-white/40">{item.time}</p>
+                        <p className="font-sans text-sm text-white/90">Completed '{item.title}' (+{item.xp} XP)</p>
+                        <p className="font-vt text-sm text-white/40">{timeAgo(item.completedAt)}</p>
                       </div>
                     </div>
                   ))}

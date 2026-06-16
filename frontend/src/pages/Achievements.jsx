@@ -10,92 +10,34 @@ export default function AchievementsApp() {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'UNLOCKED' | 'LOCKED'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Exactly 50 Achievements Categorized by color/theme (catalog; unlock state from the API)
-  const ACHIEVEMENT_CATALOG = [
-    // 🟢 QUESTS & TASKS (Green)
-    { id: 1, title: 'FIRST BLOOD', desc: 'Selesaikan 1 Quest pertama.', emoji: '🔪', color: '#A3FF12', unlocked: true },
-    { id: 2, title: 'TASK SLAYER', desc: 'Selesaikan 10 Quest.', emoji: '⚔️', color: '#A3FF12', unlocked: true },
-    { id: 3, title: 'QUEST KNIGHT', desc: 'Selesaikan 50 Quest.', emoji: '🛡️', color: '#A3FF12', unlocked: false },
-    { id: 4, title: 'TASK LORD', desc: 'Selesaikan 100 Quest.', emoji: '👑', color: '#A3FF12', unlocked: false },
-    { id: 5, title: 'GRANDMASTER', desc: 'Selesaikan 500 Quest.', emoji: '🐉', color: '#A3FF12', unlocked: false },
-    { id: 6, title: 'EARLY BIRD', desc: 'Selesaikan Quest sebelum jam 6 pagi.', emoji: '🌅', color: '#A3FF12', unlocked: true },
-    { id: 7, title: 'NIGHT OWL', desc: 'Selesaikan Quest di atas jam 12 malam.', emoji: '🦉', color: '#A3FF12', unlocked: true },
-    { id: 8, title: 'WEEKEND WARRIOR', desc: 'Selesaikan 5 Quest di hari Minggu.', emoji: '🎉', color: '#A3FF12', unlocked: false },
-    { id: 9, title: 'FROG EATER', desc: 'Selesaikan Quest XP tertinggi pertama hari ini.', emoji: '🐸', color: '#A3FF12', unlocked: false },
-    { id: 10, title: 'INBOX ZERO', desc: 'Kosongkan daftar Quest harianmu.', emoji: '✅', color: '#A3FF12', unlocked: true },
-
-    // 🟠 STREAKS & CONSISTENCY (Orange)
-    { id: 11, title: 'THE SPARK', desc: 'Login 3 hari berturut-turut.', emoji: '🔥', color: '#FF9F1C', unlocked: true },
-    { id: 12, title: 'THE FLAME', desc: 'Login 7 hari berturut-turut.', emoji: '⛺', color: '#FF9F1C', unlocked: true },
-    { id: 13, title: 'THE BONFIRE', desc: 'Login 14 hari berturut-turut.', emoji: '🎇', color: '#FF9F1C', unlocked: true },
-    { id: 14, title: 'WILDFIRE', desc: 'Login 30 hari berturut-turut.', emoji: '🌋', color: '#FF9F1C', unlocked: false },
-    { id: 15, title: 'INFERNO', desc: 'Login 100 hari berturut-turut.', emoji: '☄️', color: '#FF9F1C', unlocked: false },
-    { id: 16, title: 'UNSTOPPABLE', desc: 'Login 365 hari (1 Tahun).', emoji: '🌞', color: '#FF9F1C', unlocked: false },
-    { id: 17, title: 'IRON WILL', desc: 'Kembalikan Streak yang sempat putus.', emoji: '⛓️', color: '#FF9F1C', unlocked: true },
-    { id: 18, title: 'CLOCKWORK', desc: 'Login di jam yang sama 5 hari berturut-turut.', emoji: '⚙️', color: '#FF9F1C', unlocked: false },
-    { id: 19, title: 'HABITUAL', desc: 'Selesaikan habit yang sama 21 hari.', emoji: '🔁', color: '#FF9F1C', unlocked: false },
-    { id: 20, title: 'RELENTLESS', desc: 'Dapatkan 10.000 XP total.', emoji: '💯', color: '#FF9F1C', unlocked: false },
-
-    // 🔴 FOCUS ARENA & BOSSES (Pink)
-    { id: 21, title: 'ARENA INITIATE', desc: 'Masuk ke Focus Arena pertama kali.', emoji: '🚪', color: '#FF5DA2', unlocked: true },
-    { id: 22, title: 'GLITCH SLAYER', desc: 'Kalahkan boss GLITCH SWARM.', emoji: '👾', color: '#FF5DA2', unlocked: true },
-    { id: 23, title: 'HYDRA TAMER', desc: 'Kalahkan boss INBOX HYDRA.', emoji: '🐙', color: '#FF5DA2', unlocked: true },
-    { id: 24, title: 'GOLEM BREAKER', desc: 'Kalahkan boss SLOTH GOLEM.', emoji: '🗿', color: '#FF5DA2', unlocked: false },
-    { id: 25, title: 'DRAGON BORN', desc: 'Kalahkan boss PROCRASTO-WYRM.', emoji: '🐉', color: '#FF5DA2', unlocked: false },
-    { id: 26, title: 'DEFLECTOR', desc: 'Gunakan fitur Block Distraction 1x.', emoji: '🛡️', color: '#FF5DA2', unlocked: true },
-    { id: 27, title: 'IRON SHIELD', desc: 'Block 100 Distractions total.', emoji: '🦾', color: '#FF5DA2', unlocked: false },
-    { id: 28, title: 'DEEP DIVER', desc: 'Selesaikan sesi fokus 60 menit penuh.', emoji: '🤿', color: '#FF5DA2', unlocked: false },
-    { id: 29, title: 'UNBROKEN', desc: 'Kalahkan 3 boss berturut-turut tanpa gagal.', emoji: '🩸', color: '#FF5DA2', unlocked: false },
-    { id: 30, title: 'TIME LORD', desc: 'Habiskan 100 Jam di Focus Arena.', emoji: '⏳', color: '#FF5DA2', unlocked: false },
-
-    // 🔵 JOURNAL & ENERGY (Cyan)
-    { id: 31, title: 'FIRST ENTRY', desc: 'Tulis jurnal mood pertamamu.', emoji: '📝', color: '#5CE1E6', unlocked: true },
-    { id: 32, title: 'ALCHEMIST', desc: 'Gunakan fitur Energy Alchemist 10x.', emoji: '⚗️', color: '#5CE1E6', unlocked: true },
-    { id: 33, title: 'AURA READER', desc: 'Temukan 5 Aura Color yang berbeda.', emoji: '🌈', color: '#5CE1E6', unlocked: false },
-    { id: 34, title: 'ZEN STATE', desc: 'Dapatkan status "Calm" atau "Zen".', emoji: '🧘', color: '#5CE1E6', unlocked: true },
-    { id: 35, title: 'HIGH ENERGY', desc: 'Dapatkan status energi level maksimal.', emoji: '🔋', color: '#5CE1E6', unlocked: false },
-    { id: 36, title: 'CHAOS THEORY', desc: 'Jurnal saat sedang burn-out/chaos.', emoji: '🌪️', color: '#5CE1E6', unlocked: true },
-    { id: 37, title: 'SELF AWARE', desc: 'Log mood 7 hari berturut-turut.', emoji: '👁️', color: '#5CE1E6', unlocked: false },
-    { id: 38, title: 'REFLECTIVE', desc: 'Tulis jurnal lebih dari 100 kata.', emoji: '📖', color: '#5CE1E6', unlocked: false },
-    { id: 39, title: 'MINDFUL', desc: 'Catat mood di pagi dan malam hari.', emoji: '🌗', color: '#5CE1E6', unlocked: false },
-    { id: 40, title: 'SOUL SEARCHER', desc: 'Gunakan Alchemist 100x.', emoji: '🌌', color: '#5CE1E6', unlocked: false },
-
-    // 🟣 SYSTEM & ORACLE (Purple)
-    { id: 41, title: 'HELLO WORLD', desc: 'Buat karakter dan masuk ke sistem.', emoji: '👋', color: '#6A4CFF', unlocked: true },
-    { id: 42, title: 'SEEKER OF TRUTH', desc: 'Tanya ke AI Oracle untuk pertama kalinya.', emoji: '🔮', color: '#6A4CFF', unlocked: true },
-    { id: 43, title: 'PROPHECY FULFILLED', desc: 'Selesaikan semua quest dari 1 sesi Oracle.', emoji: '📜', color: '#6A4CFF', unlocked: false },
-    { id: 44, title: 'LORE MASTER', desc: 'Tanya Oracle 50x.', emoji: '🧙♂️', color: '#6A4CFF', unlocked: false },
-    { id: 45, title: 'BARD TALE', desc: 'Gunakan fitur BARDIFY pada task 10x.', emoji: '🪕', color: '#6A4CFF', unlocked: true },
-    { id: 46, title: 'CYBER HACKER', desc: 'Selesaikan 100 Task ber-tag CODE.', emoji: '💻', color: '#6A4CFF', unlocked: false },
-    { id: 47, title: 'NEON ARTIST', desc: 'Selesaikan 100 Task ber-tag DESIGN.', emoji: '🎨', color: '#6A4CFF', unlocked: false },
-    { id: 48, title: 'STREET SAMURAI', desc: 'Selesaikan 100 Task ber-tag HUSTLE.', emoji: '🥷', color: '#6A4CFF', unlocked: false },
-    { id: 49, title: 'OVERCLOCKER', desc: 'Dapatkan 1000 XP dalam satu hari.', emoji: '🚀', color: '#6A4CFF', unlocked: false },
-    { id: 50, title: 'SECOND BRAIN', desc: 'Selesaikan 100% dari semua 49 Achievement.', emoji: '🧠', color: '#6A4CFF', unlocked: false },
-
-    // 🛑 SECRET ANOMALIES (Red/Glitch) - Tidak dihitung ke total 50
-    { id: 99, title: 'GHOST IN THE MACHINE', desc: 'Temukan pesan rahasia di dalam source code sistem.', emoji: '👁️', color: '#FF003C', unlocked: true, isSecret: true },
-    { id: 100, title: 'NIGHTMARE MODE', desc: 'Selesaikan 5 Boss Arena berturut-turut tanpa gagal.', emoji: '🩸', color: '#FF003C', unlocked: false, isSecret: true }
-  ];
-
-  // Unlock state comes from the backend; the catalog above is local metadata.
-  const [achievementsData, setAchievementsData] = useState(() => ACHIEVEMENT_CATALOG.map(a => ({ ...a, unlocked: false })));
+  // The achievement catalog and the player's unlock state both come from the
+  // backend; the catalog is merged with the set of unlocked achievement ids.
+  const [achievementsData, setAchievementsData] = useState([]);
 
   useEffect(() => {
     let active = true;
-    api.getMyAchievements()
-      .then((mine) => {
+    api.getAchievements()
+      .then(async (catalog) => {
         if (!active) return;
-        const owned = new Set(mine.map(m => m.achievementId));
-        setAchievementsData(ACHIEVEMENT_CATALOG.map(a => ({ ...a, unlocked: owned.has(a.id) })));
+        let owned = new Set();
+        try {
+          const mine = await api.getMyAchievements();
+          owned = new Set(mine.map(m => m.achievementId));
+        } catch {
+          // Not signed in yet (or transient error): show the catalog fully locked.
+        }
+        if (!active) return;
+        setAchievementsData(catalog.map(a => ({ ...a, unlocked: owned.has(a.id) })));
       })
       .catch(() => {});
     return () => { active = false; };
   }, []);
 
-  // Calculate progress HANYA untuk achievement normal (Maksimal 50)
+  // Progress counts only the regular (non-secret) achievements.
   const regularAchievements = achievementsData.filter(a => !a.isSecret);
   const unlockedCount = regularAchievements.filter(a => a.unlocked).length;
-  const progressPercent = Math.round((unlockedCount / 50) * 100);
+  const regularTotal = regularAchievements.length;
+  const progressPercent = regularTotal ? Math.round((unlockedCount / regularTotal) * 100) : 0;
 
   const filteredAchievements = achievementsData.filter(a => {
     const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.desc.toLowerCase().includes(searchQuery.toLowerCase());
@@ -254,7 +196,7 @@ export default function AchievementsApp() {
           <div className="w-full md:w-96 bg-black/50 border-2 border-white/20 p-4 rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between font-pixel text-[10px] text-white mb-3">
               <span className="text-[#FFD60A]">GLOBAL PROGRESS</span>
-              <span className="text-[#00B4FF]">{unlockedCount} / 50</span>
+              <span className="text-[#00B4FF]">{unlockedCount} / {regularTotal}</span>
             </div>
             <div className="w-full h-4 bg-[#111] border border-white/10 rounded overflow-hidden">
               <div
@@ -276,7 +218,7 @@ export default function AchievementsApp() {
               onClick={() => setFilter('ALL')}
               className={`font-vt text-xl md:text-2xl px-6 py-2 rounded-lg border-2 transition-all shrink-0 ${filter === 'ALL' ? 'bg-white text-black border-white shadow-[4px_4px_0_0_#FF5DA2]' : 'bg-transparent text-white/50 border-transparent hover:bg-white/10'}`}
             >
-              ALL (50)
+              ALL ({regularTotal})
             </button>
             <button
               onClick={() => setFilter('UNLOCKED')}

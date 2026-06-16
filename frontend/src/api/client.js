@@ -44,6 +44,8 @@ export const api = {
 
   // Quests
   getQuests: () => request('/quests'),
+  getQuestStreak: () => request('/quests/streak'),
+  getQuestActivity: () => request('/quests/activity'),
   createQuest: (data) => request('/quests', { method: 'POST', body: data }),
   updateQuest: (id, data) => request(`/quests/${id}`, { method: 'PATCH', body: data }),
   deleteQuest: (id) => request(`/quests/${id}`, { method: 'DELETE' }),

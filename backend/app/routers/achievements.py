@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+from ..achievements_engine import OBTAINABLE_ACHIEVEMENT_IDS
 from ..database import fetch_all, get_conn
 from ..firebase import get_current_user
 
@@ -21,7 +22,10 @@ def serialize_achievement(achievement: dict) -> dict:
 @router.get("/achievements")
 def list_achievements(conn=Depends(get_conn)):
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM achievements ORDER BY id")
+    cursor.execute(
+        "SELECT * FROM achievements WHERE id = ANY(%s) ORDER BY id",
+        (sorted(OBTAINABLE_ACHIEVEMENT_IDS),),
+    )
     return [serialize_achievement(item) for item in fetch_all(cursor)]
 
 

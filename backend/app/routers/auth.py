@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..achievements_engine import evaluate_achievements
 from ..database import fetch_one, get_conn
 from ..firebase import get_current_user
 from ..schemas import RegisterRequest
@@ -65,6 +66,7 @@ def register(
             "#6A4CFF",
         ),
     )
+    evaluate_achievements(cursor, user["id"])
     conn.commit()
 
     cursor.execute("SELECT * FROM users WHERE id = %s", (user["id"],))

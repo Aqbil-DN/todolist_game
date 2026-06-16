@@ -22,51 +22,48 @@ import img13 from '../assets/card_pull/13.png';
 import img14 from '../assets/card_pull/14.png';
 import img15 from '../assets/card_pull/15.png';
 
-const heroImages = [
-  img1, img2, img3, img4, img5, img6, img7, img8, img9, img10, img11, img12, img13, img14, img15
-];
+// Card art is bundled with the app; the backend catalog references it by filename.
+const heroImageByFile = {
+  '01.png': img1, '02.png': img2, '03.png': img3, '04.png': img4, '05.png': img5,
+  '06.png': img6, '07.png': img7, '08.png': img8, '09.png': img9, '10.png': img10,
+  '11.png': img11, '12.png': img12, '13.png': img13, '14.png': img14, '15.png': img15,
+};
 
 export default function HeroCollectionApp() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'UNLOCKED' | 'LOCKED'
   const [rarityFilter, setRarityFilter] = useState('ALL'); // 'ALL' | 'LEGENDARY' | 'EPIC' | 'RARE'
 
-  // Data 15 Neural Net Idols (catalog art + metadata; unlock state comes from the API)
-  const HERO_CATALOG = [
-    { id: '001', name: 'OMEGA', title: 'THE SOVEREIGN AI', rarity: 'LEGENDARY', color: '#FF003C', glow: '#FFD60A', emoji: '👑', img: heroImages[0], unlocked: true, desc: 'Master Taskmaster. Rules the digital void with absolute efficiency. Grants immense XP boosts.' },
-    { id: '002', name: 'KAIRO', title: 'THE CHRONO-WITCH', rarity: 'EPIC', color: '#9D4EDD', glow: '#FF5DA2', emoji: '⏳', img: heroImages[1], unlocked: true, desc: 'Focus Arena Master. Bends time to maximize deep work sessions. Slows down distraction timers.' },
-    { id: '003', name: 'CYPHER', title: 'THE GHOST NETRUNNER', rarity: 'EPIC', color: '#00B4FF', glow: '#9D4EDD', emoji: '🥷', img: heroImages[2], unlocked: false, desc: 'AI Oracle Agent. Navigates the data streams unseen. Reveals hidden sub-quests.' },
-    { id: '004', name: 'GIA', title: 'THE ENERGY ALCHEMIST', rarity: 'EPIC', color: '#FF5DA2', glow: '#A3FF12', emoji: '⚗️', img: heroImages[3], unlocked: true, desc: 'Mood Journal Spirit. Transmutes chaotic emotions into raw productive power.' },
-    { id: '005', name: 'REX', title: 'THE CYBER-SAMURAI', rarity: 'EPIC', color: '#A3FF12', glow: '#00B4FF', emoji: '⚔️', img: heroImages[4], unlocked: false, desc: 'Habit Warrior. Slices through procrastination with unmatched discipline and a neon katana.' },
-    { id: '006', name: 'PULSE', title: 'THE DATA DRUMMER', rarity: 'RARE', color: '#00B4FF', glow: '#00B4FF', emoji: '🥁', img: heroImages[5], unlocked: true, desc: 'Rhythm Keeper. Keeps the system heartbeat steady. Boosts consistency multipliers.' },
-    { id: '007', name: 'VECTOR', title: 'THE GRAFFITI HACKER', rarity: 'RARE', color: '#FFD60A', glow: '#FF5DA2', emoji: '🎨', img: heroImages[6], unlocked: true, desc: 'Creative Spark. Paints the gray mainframe with brilliant ideas. Enhances design tasks.' },
-    { id: '008', name: 'SHADE', title: 'THE COFFEE TECHNO-MAGE', rarity: 'RARE', color: '#FF9F1C', glow: '#FFD60A', emoji: '☕', img: heroImages[7], unlocked: false, desc: 'Alertness Spirit. Brews the finest digital caffeine for endless stamina in the late hours.' },
-    { id: '009', name: 'NOVA', title: 'THE STAR-CHART PILOT', rarity: 'RARE', color: '#A3FF12', glow: '#A3FF12', emoji: '🚀', img: heroImages[8], unlocked: true, desc: 'Goal Navigator. Charts the optimal course through the habit galaxy.' },
-    { id: '010', name: 'BLADE', title: 'THE INBOX-SLAYER', rarity: 'RARE', color: '#9D4EDD', glow: '#9D4EDD', emoji: '🗡️', img: heroImages[9], unlocked: true, desc: 'Organization Expert. Clears unread messages and clutter with lethal precision.' },
-    { id: '011', name: 'REZ', title: 'THE GLITCH-GEISHA', rarity: 'RARE', color: '#FF003C', glow: '#00B4FF', emoji: '🎎', img: heroImages[10], unlocked: false, desc: 'Anomaly Detector. Finds and neutralizes system bugs gracefully with her fan of code.' },
-    { id: '012', name: 'DRIFT', title: 'THE SYNTHWAVE RACER', rarity: 'RARE', color: '#FF5DA2', glow: '#FFD60A', emoji: '🏎️', img: heroImages[11], unlocked: true, desc: 'Speed Organizer. Accelerates through daily repetitive tasks at terminal velocity.' },
-    { id: '013', name: 'ECHO', title: 'THE SOUND-TRACKER', rarity: 'RARE', color: '#5CE1E6', glow: '#5CE1E6', emoji: '🎧', img: heroImages[12], unlocked: false, desc: 'Focus Beats. Drowns out real-world distractions with heavy cyber-bass.' },
-    { id: '014', name: 'LOOP', title: 'THE HABIT-BOT', rarity: 'RARE', color: '#A3FF12', glow: '#FF5DA2', emoji: '🤖', img: heroImages[13], unlocked: true, desc: 'Consistency Drone. Automates repetitive thought processes without fatigue.' },
-    { id: '015', name: 'SPARK', title: 'THE IDEA-COLLECTOR', rarity: 'RARE', color: '#FFD60A', glow: '#00B4FF', emoji: '💡', img: heroImages[14], unlocked: false, desc: 'Note Taker. Captures fleeting thoughts before they dissolve into the void.' },
-  ];
-
-  // Hero unlock state comes from the backend; the catalog above is local art/meta.
-  const [heroesData, setHeroesData] = useState(() => HERO_CATALOG.map(h => ({ ...h, unlocked: false })));
+  // The hero catalog (art + metadata) and the player's unlock state both come
+  // from the backend; card art is resolved from the bundled assets by filename.
+  const [heroesData, setHeroesData] = useState([]);
 
   useEffect(() => {
     let active = true;
-    api.getMyHeroes()
-      .then((mine) => {
+    api.getHeroes()
+      .then(async (catalog) => {
         if (!active) return;
-        const owned = new Set(mine.map(m => m.heroId));
-        setHeroesData(HERO_CATALOG.map(h => ({ ...h, unlocked: owned.has(h.id) })));
+        let owned = new Set();
+        try {
+          const mine = await api.getMyHeroes();
+          owned = new Set(mine.map(m => m.heroId));
+        } catch {
+          // Not signed in yet (or transient error): show the catalog fully locked.
+        }
+        if (!active) return;
+        setHeroesData(catalog.map(h => ({
+          ...h,
+          img: heroImageByFile[h.img],
+          unlocked: owned.has(h.id),
+        })));
       })
       .catch(() => {});
     return () => { active = false; };
   }, []);
 
   const unlockedCount = heroesData.filter(h => h.unlocked).length;
-  const progressPercent = Math.round((unlockedCount / 15) * 100);
+  const totalCount = heroesData.length;
+  const progressPercent = totalCount ? Math.round((unlockedCount / totalCount) * 100) : 0;
 
   const filteredHeroes = heroesData.filter(h => {
     const matchesStatus = filter === 'ALL' || (filter === 'UNLOCKED' && h.unlocked) || (filter === 'LOCKED' && !h.unlocked);
@@ -213,7 +210,7 @@ export default function HeroCollectionApp() {
           <div className="w-full lg:w-1/3">
             <div className="flex justify-between font-pixel text-[10px] text-white mb-2">
               <span className="text-[#A3FF12]">COLLECTION PROTOCOL</span>
-              <span>{unlockedCount} / 15</span>
+              <span>{unlockedCount} / {totalCount}</span>
             </div>
             <div className="w-full h-3 bg-[#111] border border-white/20 rounded-full overflow-hidden">
               <div
