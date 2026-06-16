@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CheckSquare,
   User, Flame, Zap, Trophy, Bell, Search, Hexagon,
-  Target, Activity, ChevronRight, ChevronLeft, Calendar, X, Shield, Cpu, Coins
+  Target, Activity, ChevronRight, ChevronLeft, Calendar, X, Shield, Cpu, Coins, Trash2
 } from 'lucide-react';
 import { useCoins } from '../useCoins';
 import { api } from '../api/client';
@@ -218,6 +218,7 @@ export default function DashboardApp() {
   const [addCalendarMonth, setAddCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
   const [editMode, setEditMode] = useState(false);
   const [selectedQuestId, setSelectedQuestId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
 
   const handleCompleteQuest = async (e, quest) => {
@@ -279,6 +280,13 @@ export default function DashboardApp() {
     setQuests(prev => prev.map(q => q.id === id ? { ...q, date: iso } : q));
     setSelectedQuestId(id);
     api.updateQuest(id, { date: iso }).catch(() => {});
+  };
+
+  const handleDeleteQuest = (id) => {
+    setQuests(prev => prev.filter(q => q.id !== id));
+    if (selectedQuestId === id) setSelectedQuestId(null);
+    setConfirmDeleteId(null);
+    api.deleteQuest(id).catch(() => {});
   };
 
   const CustomStyles = () => (
@@ -541,7 +549,7 @@ export default function DashboardApp() {
                     </h3>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => { setEditMode(!editMode); if (editMode) setSelectedQuestId(null); }}
+                        onClick={() => { setEditMode(!editMode); if (editMode) { setSelectedQuestId(null); setConfirmDeleteId(null); } }}
                         className={`font-pixel text-[10px] px-4 py-2 rounded-full border-2 transition-all ${editMode ? 'bg-[#FFD60A] text-black border-white comic-shadow-pink' : 'bg-transparent text-[#FFD60A] border-[#FFD60A] hover:bg-[#FFD60A]/10'}`}
                       >
                         {editMode ? 'DONE' : 'EDIT'}
@@ -686,6 +694,22 @@ export default function DashboardApp() {
                                           <option key={f.key} value={f.key}>{f.label}</option>
                                         ))}
                                       </select>
+                                      {confirmDeleteId === quest.id ? (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleDeleteQuest(quest.id); }}
+                                          className="flex items-center gap-1.5 bg-[#FF3B3B] text-white font-pixel text-[9px] px-3 py-2 rounded-lg border-2 border-white hover:brightness-110 transition-all"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" /> SURE?
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(quest.id); }}
+                                          className="p-2 rounded-lg border-2 border-[#FF3B3B]/50 text-[#FF3B3B] hover:bg-[#FF3B3B]/10 transition-colors shrink-0"
+                                          aria-label="Delete quest"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
                                     </div>
                                   ) : (
                                     <div className="font-vt text-3xl shrink-0" style={{ color: quest.completed ? '#666' : quest.color }}>+{quest.xp} XP</div>
